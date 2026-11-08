@@ -1,0 +1,14 @@
+# Локальное окружение и кэши — не отслеживаются Git
+
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.hypothesis/
+.ipynb_checkpoints/
+
+# Служебные файлы ОС и редакторов
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
