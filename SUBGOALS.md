@@ -27,15 +27,21 @@
 ## П3. Код эксперимента `src/ppg/` и скрипты этапов
 
 - **Критерий завершения:** измеритель пиков, расчёт ошибок и фильтрация
-  реализованы по §2 и §4; `run_experiment.py prepare` выполняется, верификатор
-  проходит.
-- **Команда проверки:** `.\.venv\Scripts\python.exe verify.py` и
-  `.\.venv\Scripts\python.exe run_experiment.py prepare`.
+  реализованы по §2 и §4; `run_experiment.py prepare` и `test` выполняются,
+  верификатор проходит.
+- **Команда проверки:** `.\.venv\Scripts\python.exe verify.py`,
+  `.\.venv\Scripts\python.exe run_experiment.py prepare`,
+  `.\.venv\Scripts\python.exe run_experiment.py test`.
 - **Состояние:** выполнено 2026-11-09 16:47 +02:00. Загрузчик
   `src/ppg/io.py` читает манифест, сигналы и разметку с проверкой контракта
   §3; `checks/test_io.py` проверяет его на синтетических файлах. Верификатор —
   код 0, 37 проверок. `run_experiment.py prepare` — код 0, 48/48 эталонов и
   240/240 входов без замечаний, план в `results/prepare/`, длительность 8,5 с.
+  Тестовый прогон `run_experiment.py test` выполнен 2026-11-09 17:01 +02:00:
+  код 0, 62 волны в окне 5–55 с, отказов нет, результаты в `results/test/`;
+  модуль `src/ppg/experiment.py` покрыт `checks/test_experiment.py` (9 проверок),
+  верификатор — код 0, 46 проверок. Независимая сверка CSV —
+  `checks/evidence/crosscheck_test_stage.py` (186 строк, расхождений нет).
 
 ## П4. Подбор настроек и основной прогон
 
