@@ -1,0 +1,11 @@
+--- src/ppg/measure.py (до)
++++ src/ppg/measure.py (с ошибкой)
+@@ -90,6 +90,6 @@
+             A1=None if p1 is None else float(x[p1] - x[s]),
+             A2=None if p2 is None else float(x[p2] - x[s]),
+-            t1=None if p1 is None else 1000.0 * (p1 - s) / fs,
+-            t2=None if p2 is None else 1000.0 * (p2 - s) / fs,
++            t1=None if p1 is None else 1000.0 * (p1 - s) / 250.0,
++            t2=None if p2 is None else 1000.0 * (p2 - s) / 250.0,
+             T=T,
+             refused_first=p1 is None,

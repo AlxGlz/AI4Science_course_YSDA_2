@@ -1,0 +1,201 @@
+Верификатор: обязательный код → обязательные проверки → pytest
+[OK] обязательный код на месте: 4 модуля
+[OK] обязательных проверок найдено: 14 из 14
+Запуск pytest для checks/ ...
+.......FFFF......FF.F......F.                                            [100%]
+================================== FAILURES ===================================
+______________________ test_control_signals_match_method ______________________
+
+    def test_control_signals_match_method() -> None:
+        """CTRL-W1…W6b: независимый перебор совпадает с таблицей §5 и с измерителем."""
+        signals = control_signals()
+        assert set(signals) == set(AGREED)
+        for name, x in signals.items():
+            expected = AGREED[name]
+            independent = independent_measurement(x, HAS_SECOND[name])
+            # 1) независимый перебор против согласованной таблицы
+            for key in ("p1", "p2", "A1", "A2", "t1", "t2"):
+                if expected[key] is None:
+                    assert independent[key] is None, (name, key, independent[key])
+                else:
+                    assert independent[key] is not None, (name, key)
+                    assert abs(independent[key] - expected[key]) <= ABS_TOL, (
+                        name, key, independent[key], expected[key])
+            # 2) измеритель проекта против согласованной таблицы
+            m = measure_wave(x, 0, WAVE_LEN, HAS_SECOND[name])
+>           _assert_measurement(m, expected)
+
+checks\test_measure.py:65: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+m = WaveMeasurement(p1=64, p2=192, A1=1.9999999999999998, A2=1.0, t1=256.0, t2=768.0, T=1000.0, refused_first=False, refused_second=False, second_required=True)
+expected = {'p1': 64, 'A1': 2.0, 't1': 200.0, 'p2': 192, ...}
+
+    def _assert_measurement(m: object, expected: dict) -> None:
+        """Сверить измерение с ожидаемым словарём (индексы точно, значения 1e-9)."""
+        for key in ("p1", "p2"):
+            if expected[key] is None:
+                assert m.p1 is None if key == "p1" else m.p2 is None
+            else:
+                got = m.p1 if key == "p1" else m.p2
+                assert got == expected[key], (key, got, expected[key])
+        for key in ("A1", "A2", "t1", "t2"):
+            if expected[key] is None:
+                assert getattr(m, key) is None, (key, getattr(m, key))
+            else:
+                got = getattr(m, key)
+                assert got is not None
+>               assert abs(got - expected[key]) <= ABS_TOL, (key, got, expected[key])
+E               AssertionError: ('t1', 256.0, 200.0)
+E               assert 56.0 <= 1e-09
+E                +  where 56.0 = abs((256.0 - 200.0))
+
+checks\test_measure.py:45: AssertionError
+____________________________ test_known_two_peaks _____________________________
+
+    def test_known_two_peaks() -> None:
+        """Два известных пика: A1=2, A2=1, t1=200, t2=600; плечо — отказ."""
+        x = controls.two_peak_wave()
+        m = measure_wave(x, 0, WAVE_LEN, True)
+        assert (m.p1, m.p2) == (64, 192)
+        assert m.A1 == pytest.approx(2.0, abs=ABS_TOL)
+        assert m.A2 == pytest.approx(1.0, abs=ABS_TOL)
+>       assert m.t1 == pytest.approx(200.0, abs=ABS_TOL)
+E       assert 256.0 == 200.0 ± 1.0e-09
+E         
+E         comparison failed
+E         Obtained: 256.0
+E         Expected: 200.0 ± 1.0e-09
+
+checks\test_measure.py:80: AssertionError
+______________________ test_flat_top_middle_rounded_down ______________________
+
+    def test_flat_top_middle_rounded_down() -> None:
+        """Плоская вершина 62..65 даёт отсчёт 63 (округление вниз), не 64."""
+        m = measure_wave(controls.flat_top_wave(), 0, WAVE_LEN, True)
+        assert m.p1 == 63
+        assert m.A1 == pytest.approx(1.99, abs=ABS_TOL)
+>       assert m.t1 == pytest.approx(196.875, abs=ABS_TOL)
+E       assert 252.0 == 196.875 ± 1.0e-09
+E         
+E         comparison failed
+E         Obtained: 252.0
+E         Expected: 196.875 ± 1.0e-09
+
+checks\test_measure.py:99: AssertionError
+____________________ test_second_peak_chosen_by_prominence ____________________
+
+    def test_second_peak_chosen_by_prominence() -> None:
+        """Второй пик выбирается по prominence (240), а не по высоте (205)."""
+        m = measure_wave(controls.prominence_wave(), 0, WAVE_LEN, True)
+        assert m.p2 == 240
+        assert m.A2 == pytest.approx(0.8, abs=ABS_TOL)
+>       assert m.t2 == pytest.approx(750.0, abs=ABS_TOL)
+E       assert 960.0 == 750.0 ± 1.0e-09
+E         
+E         comparison failed
+E         Obtained: 960.0
+E         Expected: 750.0 ± 1.0e-09
+
+checks\test_measure.py:107: AssertionError
+_______________________ test_known_time_shift[4-212.5] ________________________
+
+shift = 4, expected_t1 = 212.5
+
+    @pytest.mark.parametrize("shift,expected_t1", [(4, 212.5), (-4, 187.5)])
+    def test_known_time_shift(shift: int, expected_t1: float) -> None:
+        """Смещение ±4 отсчёта: Δt = 12,5 мс, 1,25 %, |ΔA| = 0 (§5)."""
+        from ppg.metrics import absolute_errors, normalized_errors
+    
+        base = measure_wave(controls.two_peak_wave(), 0, WAVE_LEN, True)
+        moved = measure_wave(controls.shifted_first_peak_wave(shift), 0, WAVE_LEN, True)
+    
+        assert moved.p1 == 64 + shift
+>       assert moved.t1 == pytest.approx(expected_t1, abs=ABS_TOL)
+E       assert 272.0 == 212.5 ± 1.0e-09
+E         
+E         comparison failed
+E         Obtained: 272.0
+E         Expected: 212.5 ± 1.0e-09
+
+checks\test_measure.py:172: AssertionError
+_______________________ test_known_time_shift[-4-187.5] _______________________
+
+shift = -4, expected_t1 = 187.5
+
+    @pytest.mark.parametrize("shift,expected_t1", [(4, 212.5), (-4, 187.5)])
+    def test_known_time_shift(shift: int, expected_t1: float) -> None:
+        """Смещение ±4 отсчёта: Δt = 12,5 мс, 1,25 %, |ΔA| = 0 (§5)."""
+        from ppg.metrics import absolute_errors, normalized_errors
+    
+        base = measure_wave(controls.two_peak_wave(), 0, WAVE_LEN, True)
+        moved = measure_wave(controls.shifted_first_peak_wave(shift), 0, WAVE_LEN, True)
+    
+        assert moved.p1 == 64 + shift
+>       assert moved.t1 == pytest.approx(expected_t1, abs=ABS_TOL)
+E       assert 240.0 == 187.5 ± 1.0e-09
+E         
+E         comparison failed
+E         Obtained: 240.0
+E         Expected: 187.5 ± 1.0e-09
+
+checks\test_measure.py:172: AssertionError
+_______________________ test_samples_to_ms_uses_320_hz ________________________
+
+    def test_samples_to_ms_uses_320_hz() -> None:
+        """Шаг сетки 3,125 мс: t(1 отсчёт) = 3,125 мс, T(320) = 1000 мс."""
+        x = controls.two_peak_wave()
+        m = measure_wave(x, 0, WAVE_LEN, True)
+        assert FS_DEFAULT == 320.0
+        assert m.T == pytest.approx(320 * 3.125, abs=ABS_TOL)
+>       assert 1000.0 * (m.p1 - 0) / 320 == pytest.approx(m.t1, abs=ABS_TOL)
+E       assert 200.0 == 256.0 ± 1.0e-09
+E         
+E         comparison failed
+E         Obtained: 200.0
+E         Expected: 256.0 ± 1.0e-09
+
+checks\test_measure.py:202: AssertionError
+__________________________ test_time_shift_property ___________________________
+
+    @given(shift=st.integers(min_value=-20, max_value=20))
+>   def test_time_shift_property(shift: int) -> None:
+                   ^^^
+
+checks\test_properties.py:62: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+shift = 0
+
+    @given(shift=st.integers(min_value=-20, max_value=20))
+    def test_time_shift_property(shift: int) -> None:
+        """Сдвиг первого бугра на целое число отсчётов смещает t1 ровно на столько."""
+        base = measure_wave(controls.two_peak_wave(), 0, WAVE_LEN, True)
+        moved = measure_wave(controls.shifted_first_peak_wave(shift), 0, WAVE_LEN, True)
+        assert moved.p1 == base.p1 + shift
+        assert moved.A1 == pytest.approx(base.A1, abs=ABS_TOL)
+        assert moved.A2 == pytest.approx(base.A2, abs=ABS_TOL)
+        assert moved.p2 == base.p2
+        expected_t1 = 1000.0 * (moved.p1 - 0) / FS
+>       assert moved.t1 == pytest.approx(expected_t1, abs=ABS_TOL)
+E       assert 256.0 == 200.0 ± 1.0e-09
+E         
+E         comparison failed
+E         Obtained: 256.0
+E         Expected: 200.0 ± 1.0e-09
+E       Falsifying example: test_time_shift_property(
+E           shift=0,  # or any other generated value
+E       )
+
+checks\test_properties.py:71: AssertionError
+=========================== short test summary info ===========================
+FAILED checks/test_measure.py::test_control_signals_match_method - AssertionE...
+FAILED checks/test_measure.py::test_known_two_peaks - assert 256.0 == 200.0 ±...
+FAILED checks/test_measure.py::test_flat_top_middle_rounded_down - assert 252...
+FAILED checks/test_measure.py::test_second_peak_chosen_by_prominence - assert...
+FAILED checks/test_measure.py::test_known_time_shift[4-212.5] - assert 272.0 ...
+FAILED checks/test_measure.py::test_known_time_shift[-4-187.5] - assert 240.0...
+FAILED checks/test_measure.py::test_samples_to_ms_uses_320_hz - assert 200.0 ...
+FAILED checks/test_properties.py::test_time_shift_property - assert 256.0 == ...
+8 failed, 21 passed in 2.31s
+Верификатор: проверки не пройдены, код 1.
