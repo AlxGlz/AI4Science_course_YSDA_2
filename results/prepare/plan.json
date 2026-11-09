@@ -1,0 +1,259 @@
+{
+  "stage": "prepare",
+  "status": "ok",
+  "generated_at": "2026-11-09T16:47:37+02:00",
+  "git_commit": "f90850f62115c9d31b4929e6e493ce8ae3347a35",
+  "dataset_version": "vasotest-v2",
+  "data_dir": "data",
+  "fs_hz": 320.0,
+  "samples_per_record": 19200,
+  "counts": {
+    "references": 48,
+    "inputs": 240,
+    "splits": {
+      "tune": {
+        "label": "данные для подбора",
+        "references": 24,
+        "inputs": 120,
+        "classes": {
+          "absent": 8,
+          "clear": 8,
+          "weak": 8
+        }
+      },
+      "holdout": {
+        "label": "данные для итоговой проверки",
+        "references": 24,
+        "inputs": 120,
+        "classes": {
+          "absent": 8,
+          "clear": 8,
+          "weak": 8
+        }
+      }
+    }
+  },
+  "filters": {
+    "grid": [
+      {
+        "f_low_hz": 0.1,
+        "f_high_hz": 3.0,
+        "N": 2
+      },
+      {
+        "f_low_hz": 0.1,
+        "f_high_hz": 3.0,
+        "N": 4
+      },
+      {
+        "f_low_hz": 0.1,
+        "f_high_hz": 5.0,
+        "N": 2
+      },
+      {
+        "f_low_hz": 0.1,
+        "f_high_hz": 5.0,
+        "N": 4
+      },
+      {
+        "f_low_hz": 0.1,
+        "f_high_hz": 8.0,
+        "N": 2
+      },
+      {
+        "f_low_hz": 0.1,
+        "f_high_hz": 8.0,
+        "N": 4
+      },
+      {
+        "f_low_hz": 0.1,
+        "f_high_hz": 12.0,
+        "N": 2
+      },
+      {
+        "f_low_hz": 0.1,
+        "f_high_hz": 12.0,
+        "N": 4
+      },
+      {
+        "f_low_hz": 0.1,
+        "f_high_hz": 20.0,
+        "N": 2
+      },
+      {
+        "f_low_hz": 0.1,
+        "f_high_hz": 20.0,
+        "N": 4
+      },
+      {
+        "f_low_hz": 0.3,
+        "f_high_hz": 3.0,
+        "N": 2
+      },
+      {
+        "f_low_hz": 0.3,
+        "f_high_hz": 3.0,
+        "N": 4
+      },
+      {
+        "f_low_hz": 0.3,
+        "f_high_hz": 5.0,
+        "N": 2
+      },
+      {
+        "f_low_hz": 0.3,
+        "f_high_hz": 5.0,
+        "N": 4
+      },
+      {
+        "f_low_hz": 0.3,
+        "f_high_hz": 8.0,
+        "N": 2
+      },
+      {
+        "f_low_hz": 0.3,
+        "f_high_hz": 8.0,
+        "N": 4
+      },
+      {
+        "f_low_hz": 0.3,
+        "f_high_hz": 12.0,
+        "N": 2
+      },
+      {
+        "f_low_hz": 0.3,
+        "f_high_hz": 12.0,
+        "N": 4
+      },
+      {
+        "f_low_hz": 0.3,
+        "f_high_hz": 20.0,
+        "N": 2
+      },
+      {
+        "f_low_hz": 0.3,
+        "f_high_hz": 20.0,
+        "N": 4
+      },
+      {
+        "f_low_hz": 0.5,
+        "f_high_hz": 3.0,
+        "N": 2
+      },
+      {
+        "f_low_hz": 0.5,
+        "f_high_hz": 3.0,
+        "N": 4
+      },
+      {
+        "f_low_hz": 0.5,
+        "f_high_hz": 5.0,
+        "N": 2
+      },
+      {
+        "f_low_hz": 0.5,
+        "f_high_hz": 5.0,
+        "N": 4
+      },
+      {
+        "f_low_hz": 0.5,
+        "f_high_hz": 8.0,
+        "N": 2
+      },
+      {
+        "f_low_hz": 0.5,
+        "f_high_hz": 8.0,
+        "N": 4
+      },
+      {
+        "f_low_hz": 0.5,
+        "f_high_hz": 12.0,
+        "N": 2
+      },
+      {
+        "f_low_hz": 0.5,
+        "f_high_hz": 12.0,
+        "N": 4
+      },
+      {
+        "f_low_hz": 0.5,
+        "f_high_hz": 20.0,
+        "N": 2
+      },
+      {
+        "f_low_hz": 0.5,
+        "f_high_hz": 20.0,
+        "N": 4
+      }
+    ],
+    "combinations": 30,
+    "f_low_hz": [
+      0.1,
+      0.3,
+      0.5
+    ],
+    "f_high_hz": [
+      3.0,
+      5.0,
+      8.0,
+      12.0,
+      20.0
+    ],
+    "orders": [
+      2,
+      4
+    ],
+    "implementation": "butter(..., output='sos') + sosfiltfilt(padtype='odd', padlen=None)"
+  },
+  "moving_average_windows": [
+    5,
+    11,
+    21,
+    41
+  ],
+  "test_input": {
+    "input_id": "08-1",
+    "reference_id": "08",
+    "wave_class": "clear"
+  },
+  "stages": [
+    {
+      "name": "test",
+      "status": "запланировано",
+      "command": ".venv\\Scripts\\python.exe run_experiment.py test"
+    },
+    {
+      "name": "select",
+      "status": "запланировано",
+      "command": ".venv\\Scripts\\python.exe run_experiment.py select"
+    },
+    {
+      "name": "main",
+      "status": "после коммита выбранных настроек",
+      "command": ".venv\\Scripts\\python.exe run_experiment.py main"
+    }
+  ],
+  "verifier": {
+    "exit_code": 0,
+    "result": "37 passed in 2.56s"
+  },
+  "integrity": {
+    "references_ok": 48,
+    "references_total": 48,
+    "inputs_ok": 240,
+    "inputs_total": 240,
+    "problems": []
+  },
+  "environment": {
+    "python": "3.13.14",
+    "packages": {
+      "numpy": "2.5.2",
+      "scipy": "1.18.1",
+      "matplotlib": "3.11.2",
+      "statsmodels": "0.14.5",
+      "pytest": "9.1.1",
+      "hypothesis": "6.142.4"
+    }
+  },
+  "elapsed_sec": 8.52
+}

@@ -36,6 +36,8 @@ REQUIRED_CODE: dict[str, tuple[str, ...]] = {
     "ppg.metrics": ("absolute_errors", "normalized_errors", "nested_mean",
                     "refusal_stats"),
     "ppg.filters": ("butter_bandpass", "moving_average"),
+    "ppg.io": ("load_dataset", "read_manifest", "read_signal",
+               "read_annotations", "sha256_file"),
 }
 
 # Обязательные проверки §5: строки таблицы и согласованные контрольные сигналы.
