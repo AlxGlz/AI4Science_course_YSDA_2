@@ -1,8 +1,8 @@
 {
   "stage": "test",
   "status": "ok",
-  "generated_at": "2026-11-09T17:03:56+02:00",
-  "git_commit": "897828b11ef3f2a6d9fe74b479f3ff896543e819",
+  "generated_at": "2026-11-09T17:56:19+02:00",
+  "git_commit": "e2f509c152e5fbf4df3aa3172f3077f46e6a7368",
   "dataset_version": "vasotest-v2",
   "data_dir": "data",
   "fs_hz": 320.0,
@@ -182,7 +182,7 @@
   ],
   "verifier": {
     "exit_code": 0,
-    "result": "46 passed in 2.39s"
+    "result": "68 passed in 3.38s"
   },
   "environment": {
     "python": "3.13.14",
@@ -195,5 +195,5 @@
       "hypothesis": "6.142.4"
     }
   },
-  "elapsed_sec": 6.32
+  "elapsed_sec": 8.61
 }

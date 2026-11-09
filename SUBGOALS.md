@@ -28,10 +28,12 @@
 
 - **Критерий завершения:** измеритель пиков, расчёт ошибок и фильтрация
   реализованы по §2 и §4; `run_experiment.py prepare` и `test` выполняются,
+  `plot_comparison.py` строит графики по сохранённым настройкам этапа,
   верификатор проходит.
 - **Команда проверки:** `.\.venv\Scripts\python.exe verify.py`,
   `.\.venv\Scripts\python.exe run_experiment.py prepare`,
-  `.\.venv\Scripts\python.exe run_experiment.py test`.
+  `.\.venv\Scripts\python.exe run_experiment.py test`,
+  `.\.venv\Scripts\python.exe plot_comparison.py --results results/test`.
 - **Состояние:** выполнено 2026-11-09 16:47 +02:00. Загрузчик
   `src/ppg/io.py` читает манифест, сигналы и разметку с проверкой контракта
   §3; `checks/test_io.py` проверяет его на синтетических файлах. Верификатор —
@@ -40,8 +42,13 @@
   Тестовый прогон `run_experiment.py test` выполнен 2026-11-09 17:01 +02:00:
   код 0, 62 волны в окне 5–55 с, отказов нет, результаты в `results/test/`;
   модуль `src/ppg/experiment.py` покрыт `checks/test_experiment.py` (9 проверок),
-  верификатор — код 0, 46 проверок. Независимая сверка CSV —
-  `checks/evidence/crosscheck_test_stage.py` (186 строк, расхождений нет).
+  верификатор — код 0, 46 проверок на момент этапа `test`. Независимая сверка
+  CSV — `checks/evidence/crosscheck_test_stage.py` (186 строк, расхождений нет).
+  Обработки вынесены в `src/ppg/methods.py`, графики — в `src/ppg/plotting.py`;
+  `plot_comparison.py --results results/test` выполнен 2026-11-09 17:58
+  (код 0, 1,8 с): обзор записи и фрагмент 5,603–7,984 с по входу `08-1`
+  в `results/test/figures/` (PNG и SVG). Верификатор — код 0, 68 проверок,
+  из них 22 новых (`checks/test_methods.py`, `checks/test_plotting.py`).
 
 ## П4. Подбор настроек и основной прогон
 

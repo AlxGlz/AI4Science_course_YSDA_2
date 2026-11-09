@@ -59,6 +59,7 @@ from ppg.experiment import (  # noqa: E402
 )
 from ppg.filters import butter_bandpass, moving_average  # noqa: E402
 from ppg.measure import FS_DEFAULT  # noqa: E402
+from ppg.methods import apply_method, method_settings  # noqa: E402
 from ppg.metrics import ABS_KEYS, nested_mean  # noqa: E402
 
 FILTER_LOW_HZ = (0.10, 0.30, 0.50)
@@ -521,26 +522,6 @@ def _write_log(path: Path, log: list[str]) -> None:
     path.write_text("\n".join(log) + "\n", encoding="utf-8")
 
 
-def _method_settings(method: dict[str, object]) -> dict[str, object]:
-    """Параметры обработки для записи в ``run.json``."""
-    keys = ("kind", "window", "f_low_hz", "f_high_hz", "N")
-    return {key: method[key] for key in keys if key in method}
-
-
-def _apply_method(signal, method: dict[str, object]):
-    """Применить обработку ко всей записи до выделения волн (§2, §4)."""
-    kind = method["kind"]
-    if kind == "raw":
-        return np.asarray(signal, dtype=np.float64).copy()
-    if kind == "moving_average":
-        return moving_average(signal, int(method["window"]))
-    if kind == "butterworth":
-        return butter_bandpass(signal, float(method["f_low_hz"]),
-                               float(method["f_high_hz"]), int(method["N"]),
-                               fs=FS_HZ)
-    raise ValueError(f"неизвестный способ обработки: {kind}")
-
-
 def _num(value: float | None, digits: int = 6) -> str:
     """Число для CSV; отказ (``None``) остаётся пустой ячейкой."""
     return "" if value is None else f"{value:.{digits}f}"
@@ -648,7 +629,7 @@ def run_test(data_dir: Path, results_dir: Path) -> int:
     refusal_rows: list[dict[str, object]] = []
     try:
         for method in TEST_METHODS:
-            processed = _apply_method(signal, method)
+            processed = apply_method(signal, method, fs=FS_HZ)
             comparisons = compare_waves(waves, clean, processed, mask, fs=FS_HZ)
             summary = _summarize_comparisons(
                 comparisons, test_row.input_id, test_row.noise_repeat)
@@ -719,7 +700,7 @@ def run_test(data_dir: Path, results_dir: Path) -> int:
             method_results.append({
                 "name": method["name"],
                 "label": method["label"],
-                "settings": _method_settings(method),
+                "settings": method_settings(method),
                 "mean_absolute": summary["mean_absolute"],
                 "mean_normalized_pct": summary["mean_normalized_pct"],
                 "values_count": summary["values_count"],
@@ -874,6 +855,13 @@ def _write_test_summary(path: Path, report: dict) -> None:
         f"из {etalon['first_peak']['expected']}, второй — "
         f"{etalon['second_peak']['expected'] - etalon['second_peak']['successes']} "
         f"из {etalon['second_peak']['expected']}.",
+        "",
+        "## Графики",
+        "",
+        "Обзор записи и увеличенный фрагмент с началами волн и найденными "
+        "пиками строятся по сохранённым настройкам командой "
+        "`plot_comparison.py --results results/test`; оглавление — "
+        "`figures/index.md`.",
         "",
         "Знаменатели средних и полные измерения по волнам — в "
         "`measurements.csv` и `errors.csv`. Превосходство фильтра в тестовом "
