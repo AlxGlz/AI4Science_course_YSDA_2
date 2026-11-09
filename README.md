@@ -48,6 +48,8 @@
   Раздел 5 `REPORT.md` заполнен по результатам `select` и `main`
   2026-11-09 18:47: таблицы ошибок и отказов, четыре парных сравнения
   с поправкой Холма, проверка условий §7.6 и ссылки на графики.
+  Сводный PDF с результатами собран из `results/main/report_src.md`
+  (pandoc + xelatex, 5 страниц): `results/main/report.pdf`.
 - **Ещё не выполнено:** раздел 7 `REPORT.md` требует проверки
   воспроизведения на чистой копии репозитория; правка отчёта и
   документации ещё не сохранена коммитом.
@@ -97,6 +99,7 @@
 | [results/select/figures/](results/select/figures/) | Обзор записи и фрагменты для входов `08-1`, `03-1`, `06-1` по выбранным настройкам. Точка входа — [index.md](results/select/figures/index.md). |
 | [results/main/](results/main/) | Основной прогон: ошибки и отказы трёх обработок на 24 эталонах проверки, сводка по эталонам, четыре парных сравнения с поправкой Холма, итог §7.6. Точка входа — [summary.md](results/main/summary.md). |
 | [results/main/figures/](results/main/figures/) | Обзор записи и фрагменты для входов `07-1`, `02-1`, `01-1` по зафиксированным настройкам. Точка входа — [index.md](results/main/figures/index.md). |
+| [results/main/report.pdf](results/main/report.pdf) | Сводный PDF с результатами эксперимента: настройки подбора, полная таблица перебора 30 полос Баттерворта с наблюдениями, ошибки и отказы, четыре парных сравнения, вывод §7.6, два графика (6 страниц). Источник — [report_src.md](results/main/report_src.md). |
 | [results/design/](results/design/) | Результаты подготовки: сводка, таблицы, журнал прогона. Точка входа — [summary.md](results/design/summary.md). |
 | [data/](data/) | Только CSV сигналов, разметки и manifest; исходные файлы сохраняются неизменными. |
 | [data/references/](data/references/) | 48 чистых эталонов по 60 секунд при 320 Гц. |
@@ -301,6 +304,15 @@ python3 design/run_design.py
 
 Код возврата 0 — обзор записи и фрагменты для трёх входов разных классов
 в `results/main/figures/`; длительность около 5 с.
+
+Сводный PDF с результатами (нужны pandoc и xelatex из TinyTeX):
+
+```powershell
+# Windows, из папки results/main
+pandoc report_src.md -o report.pdf --pdf-engine=xelatex -N -V geometry:margin=2cm -V fontsize=10pt -V mainfont="Georgia" -V sansfont="Segoe UI" -V monofont="Consolas" -V lang=ru-RU -V colorlinks=true
+```
+
+Готовый файл — `results/main/report.pdf`, 6 страниц, около 400 КБ.
 
 Демонстрация намеренной ошибки (из корня проекта, Windows):
 
