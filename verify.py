@@ -31,13 +31,17 @@ CHECKS = ROOT / "checks"
 REQUIRED_CODE: dict[str, tuple[str, ...]] = {
     "ppg": ("measure_wave", "measure_waves", "butter_bandpass",
             "moving_average", "absolute_errors", "normalized_errors",
-            "nested_mean", "refusal_stats"),
+            "nested_mean", "refusal_stats", "compare_waves",
+            "select_evaluation_mask"),
     "ppg.measure": ("WaveMeasurement", "measure_wave", "measure_waves"),
     "ppg.metrics": ("absolute_errors", "normalized_errors", "nested_mean",
                     "refusal_stats"),
     "ppg.filters": ("butter_bandpass", "moving_average"),
     "ppg.io": ("load_dataset", "read_manifest", "read_signal",
                "read_annotations", "sha256_file"),
+    "ppg.experiment": ("select_evaluation_mask", "compare_waves",
+                       "error_series", "value_counts", "refusal_summary",
+                       "etalon_refusal_summary"),
 }
 
 # Обязательные проверки §5: строки таблицы и согласованные контрольные сигналы.

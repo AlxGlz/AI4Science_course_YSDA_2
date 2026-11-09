@@ -1,0 +1,13 @@
+source,method,peak,expected,successes,refusals,refusal_pct
+обработка,raw,first_peak,62,62,0,0.000
+обработка,raw,second_peak,62,62,0,0.000
+эталон,raw,first_peak,62,62,0,0.000
+эталон,raw,second_peak,62,62,0,0.000
+обработка,moving_average_11,first_peak,62,62,0,0.000
+обработка,moving_average_11,second_peak,62,62,0,0.000
+эталон,moving_average_11,first_peak,62,62,0,0.000
+эталон,moving_average_11,second_peak,62,62,0,0.000
+обработка,butterworth_0.30_8.0_N2,first_peak,62,62,0,0.000
+обработка,butterworth_0.30_8.0_N2,second_peak,62,62,0,0.000
+эталон,butterworth_0.30_8.0_N2,first_peak,62,62,0,0.000
+эталон,butterworth_0.30_8.0_N2,second_peak,62,62,0,0.000

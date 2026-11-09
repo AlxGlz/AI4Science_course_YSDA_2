@@ -9,6 +9,15 @@
 from __future__ import annotations
 
 from .filters import butter_bandpass, moving_average
+from .experiment import (
+    WaveComparison,
+    compare_waves,
+    error_series,
+    etalon_refusal_summary,
+    refusal_summary,
+    select_evaluation_mask,
+    value_counts,
+)
 from .io import (
     CLASS_LABELS,
     SPLIT_LABELS,
@@ -41,6 +50,13 @@ __all__ = [
     "refusal_stats",
     "butter_bandpass",
     "moving_average",
+    "WaveComparison",
+    "compare_waves",
+    "error_series",
+    "value_counts",
+    "refusal_summary",
+    "etalon_refusal_summary",
+    "select_evaluation_mask",
     "ManifestRow",
     "WaveTable",
     "ReferenceData",

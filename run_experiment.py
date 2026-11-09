@@ -1,19 +1,21 @@
 """Этапы эксперимента §6 методики.
 
-Реализован этап ``prepare``: проверка данных и верификатора и сохранение
-плана расчётов в ``results/prepare/``. Экспериментальные вычисления на этом
-этапе не выполняются (§6).
+Реализованы этапы ``prepare`` (проверка данных и верификатора, план расчётов)
+и ``test`` (однократный прогон на одном входе с сохранением измерений,
+ошибок, отказов и настроек). Этапы ``select`` и ``main`` пока не реализованы.
 
 Команды (из корня проекта):
 
     Windows: ``.\\venv\\Scripts\\python.exe run_experiment.py prepare``
+             ``.\\venv\\Scripts\\python.exe run_experiment.py test``
     macOS:   ``./.venv/bin/python run_experiment.py prepare``
+             ``./.venv/bin/python run_experiment.py test``
 
 Данные: ``data/manifest.csv``, ``data/references/``, ``data/noisy/``,
-``data/annotations/``; чтение — через ``ppg.io``, без вычисления пиков.
-Проверка: ``verify.py`` (запускается этим скриптом первым шагом) и
-``results/prepare/``.
-Используется в: этапы ``test``, ``select``, ``main`` после реализации.
+``data/annotations/``; чтение — через ``ppg.io``, вычисления — через
+``ppg.experiment``, ``ppg.filters``, ``ppg.measure``, ``ppg.metrics``.
+Проверка: ``verify.py`` (запускается этим скриптом первым шагом).
+Используется в: этапы ``select`` и ``main`` после реализации.
 """
 
 from __future__ import annotations
@@ -31,6 +33,8 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
+import numpy as np
+
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 
@@ -43,6 +47,19 @@ from ppg.io import (  # noqa: E402
     read_signal,
     sha256_file,
 )
+from ppg.experiment import (  # noqa: E402
+    EVAL_END_SEC,
+    EVAL_START_SEC,
+    compare_waves,
+    error_series,
+    etalon_refusal_summary,
+    refusal_summary,
+    select_evaluation_mask,
+    value_counts,
+)
+from ppg.filters import butter_bandpass, moving_average  # noqa: E402
+from ppg.measure import FS_DEFAULT  # noqa: E402
+from ppg.metrics import ABS_KEYS, nested_mean  # noqa: E402
 
 FILTER_LOW_HZ = (0.10, 0.30, 0.50)
 FILTER_HIGH_HZ = (3.0, 5.0, 8.0, 12.0, 20.0)
@@ -53,6 +70,19 @@ EXPECTED_REFERENCES = 48
 EXPECTED_INPUTS = 240
 EXPECTED_PER_SPLIT = 24
 EXPECTED_PER_CLASS = 8
+FS_HZ = 320.0
+
+# Этап §6: тестовый вход, сырой сигнал, среднее с окном 11 и Баттерворт
+# N=2 с полосой 0,30–8 Гц.
+TEST_METHODS: tuple[dict[str, object], ...] = (
+    {"name": "raw", "label": "сырой сигнал", "kind": "raw"},
+    {"name": "moving_average_11",
+     "label": "скользящее среднее, окно 11",
+     "kind": "moving_average", "window": 11},
+    {"name": "butterworth_0.30_8.0_N2",
+     "label": "Баттерворт N=2, 0,30–8 Гц",
+     "kind": "butterworth", "f_low_hz": 0.30, "f_high_hz": 8.0, "N": 2},
+)
 
 
 def natural_key(text: str) -> list[object]:
@@ -491,6 +521,373 @@ def _write_log(path: Path, log: list[str]) -> None:
     path.write_text("\n".join(log) + "\n", encoding="utf-8")
 
 
+def _method_settings(method: dict[str, object]) -> dict[str, object]:
+    """Параметры обработки для записи в ``run.json``."""
+    keys = ("kind", "window", "f_low_hz", "f_high_hz", "N")
+    return {key: method[key] for key in keys if key in method}
+
+
+def _apply_method(signal, method: dict[str, object]):
+    """Применить обработку ко всей записи до выделения волн (§2, §4)."""
+    kind = method["kind"]
+    if kind == "raw":
+        return np.asarray(signal, dtype=np.float64).copy()
+    if kind == "moving_average":
+        return moving_average(signal, int(method["window"]))
+    if kind == "butterworth":
+        return butter_bandpass(signal, float(method["f_low_hz"]),
+                               float(method["f_high_hz"]), int(method["N"]),
+                               fs=FS_HZ)
+    raise ValueError(f"неизвестный способ обработки: {kind}")
+
+
+def _num(value: float | None, digits: int = 6) -> str:
+    """Число для CSV; отказ (``None``) остаётся пустой ячейкой."""
+    return "" if value is None else f"{value:.{digits}f}"
+
+
+def _index(value: int | None) -> str:
+    return "" if value is None else str(value)
+
+
+def _summarize_comparisons(comparisons, input_id: str,
+                           noise_repeat: int) -> dict[str, object]:
+    """Ошибки и отказы метода: средние с равными весами и знаменатели (§2)."""
+    absolute = error_series(comparisons)
+    normalized = error_series(comparisons, normalized=True)
+    return {
+        "mean_absolute": {
+            key: nested_mean({input_id: {noise_repeat: values}})
+            for key, values in absolute.items()},
+        "mean_normalized_pct": {
+            key: nested_mean({input_id: {noise_repeat: values}})
+            for key, values in normalized.items()},
+        "values_count": value_counts(absolute),
+        "refusals": refusal_summary(comparisons),
+        "etalon_refusals": etalon_refusal_summary(comparisons),
+    }
+
+
+def run_test(data_dir: Path, results_dir: Path) -> int:
+    """Этап ``test``: один вход, три обработки, ошибки и отказы (§6)."""
+    started = time.perf_counter()
+    out_dir = results_dir / "test"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    log: list[str] = []
+
+    def say(message: str = "") -> None:
+        print(message)
+        log.append(message)
+
+    say("run_experiment.py test — тестовый прогон на одном входе (§6)")
+    say(f"Каталог данных: {data_dir}")
+    say(f"Каталог результатов: {out_dir}")
+
+    verify_code, verify_passed = _run_verifier(out_dir, say)
+    if verify_code != 0:
+        say("Тестовый прогон остановлен: верификатор не прошёл.")
+        _write_log(out_dir / "run_log.txt", log)
+        return verify_code
+
+    try:
+        dataset = load_dataset(data_dir)
+        test_row = _choose_test_input(dataset)
+    except (FileNotFoundError, ValueError) as exc:
+        say(f"Тестовый прогон остановлен: данные не читаются: {exc}")
+        _write_log(out_dir / "run_log.txt", log)
+        return 1
+
+    plan_path = results_dir / "prepare" / "plan.json"
+    if plan_path.is_file():
+        planned = json.loads(plan_path.read_text(encoding="utf-8"))
+        planned_id = planned.get("test_input", {}).get("input_id")
+        if planned_id and planned_id != test_row.input_id:
+            say(f"Остановка: план подготовки указывает вход {planned_id}, "
+                f"а правило §6 выбирает {test_row.input_id}.")
+            _write_log(out_dir / "run_log.txt", log)
+            return 1
+        say(f"План подготовки подтверждает тестовый вход {test_row.input_id}.")
+
+    reference = dataset.references[test_row.reference_id]
+    clean_path = reference.clean_path
+    noisy_path = (data_dir / test_row.noisy_path).resolve()
+    clean_row = next(row for row in reference.inputs
+                     if row.noise_repeat == 1)
+
+    for label, path, expected_sha in (
+            ("шумовой вход", noisy_path, test_row.noisy_sha256),
+            ("чистый эталон", clean_path, clean_row.clean_sha256)):
+        actual = sha256_file(path)
+        if actual != expected_sha:
+            say(f"Остановка: SHA-256 {label} не совпал с манифестом.")
+            _write_log(out_dir / "run_log.txt", log)
+            return 1
+
+    try:
+        signal = read_signal(noisy_path, expected_samples=SAMPLES_PER_RECORD)
+        clean = read_signal(clean_path, expected_samples=SAMPLES_PER_RECORD)
+    except ValueError as exc:
+        say(f"Остановка: сигнал не читается: {exc}")
+        _write_log(out_dir / "run_log.txt", log)
+        return 1
+
+    waves = reference.waves
+    mask = select_evaluation_mask(waves, fs=FS_HZ)
+    selected = int(np.count_nonzero(mask))
+    say(f"Вход {test_row.input_id}: эталон {test_row.reference_id}, "
+        f"часть «{SPLIT_LABELS[test_row.split]}», класс "
+        f"«{CLASS_LABELS[test_row.wave_class]}», реализация "
+        f"№{test_row.noise_repeat}.")
+    say(f"Волн в разметке: {len(waves)}; в окне оценки "
+        f"{EVAL_START_SEC:.0f}–{EVAL_END_SEC:.0f} с: {selected} "
+        f"(с вторым пиком {int(np.count_nonzero(waves.has_diastolic_peak[mask]))}).")
+
+    method_results: list[dict[str, object]] = []
+    measurement_rows: list[dict[str, object]] = []
+    error_rows: list[dict[str, object]] = []
+    refusal_rows: list[dict[str, object]] = []
+    try:
+        for method in TEST_METHODS:
+            processed = _apply_method(signal, method)
+            comparisons = compare_waves(waves, clean, processed, mask, fs=FS_HZ)
+            summary = _summarize_comparisons(
+                comparisons, test_row.input_id, test_row.noise_repeat)
+            say(f"{method['label']}: ошибки A1 {_num(summary['mean_normalized_pct']['A1'], 3)} %, "
+                f"t1 {_num(summary['mean_normalized_pct']['t1'], 3)} %, "
+                f"A2 {_num(summary['mean_normalized_pct']['A2'], 3)} %, "
+                f"t2 {_num(summary['mean_normalized_pct']['t2'], 3)} %; "
+                f"отказы 1-го пика "
+                f"{summary['refusals']['first_peak']['expected'] - summary['refusals']['first_peak']['successes']}, "
+                f"2-го пика "
+                f"{summary['refusals']['second_peak']['expected'] - summary['refusals']['second_peak']['successes']}.")
+
+            for item in comparisons:
+                row = {
+                    "method": method["name"],
+                    "method_label": method["label"],
+                    "wave_index": item.wave_index,
+                    "start_idx": item.start_idx,
+                    "end_idx": item.end_idx,
+                    "has_diastolic_peak": int(item.has_diastolic_peak),
+                }
+                for prefix, measurement in (("etalon", item.etalon),
+                                            ("estimate", item.estimate)):
+                    row.update({
+                        f"{prefix}_p1": _index(measurement.p1),
+                        f"{prefix}_A1": _num(measurement.A1),
+                        f"{prefix}_t1": _num(measurement.t1),
+                        f"{prefix}_p2": _index(measurement.p2),
+                        f"{prefix}_A2": _num(measurement.A2),
+                        f"{prefix}_t2": _num(measurement.t2),
+                        f"{prefix}_T": _num(measurement.T),
+                    })
+                row.update({
+                    "refused_first": int(item.estimate.refused_first),
+                    "refused_second": int(item.estimate.refused_second),
+                    "second_required": int(item.estimate.second_required),
+                })
+                for key in ABS_KEYS:
+                    row[f"abs_{key}"] = _num(item.absolute[key])
+                for key in ABS_KEYS:
+                    row[f"norm_{key}"] = _num(item.normalized[key])
+                measurement_rows.append(row)
+
+            for key in ABS_KEYS:
+                error_rows.append({
+                    "method": method["name"],
+                    "method_label": method["label"],
+                    "metric": key,
+                    "mean_absolute": _num(summary["mean_absolute"][key]),
+                    "mean_normalized_pct": _num(
+                        summary["mean_normalized_pct"][key]),
+                    "values_count": summary["values_count"][key],
+                })
+
+            for source, stats in (("обработка", summary["refusals"]),
+                                  ("эталон", summary["etalon_refusals"])):
+                for peak, item in stats.items():
+                    refusal_rows.append({
+                        "source": source,
+                        "method": method["name"],
+                        "peak": peak,
+                        "expected": item["expected"],
+                        "successes": item["successes"],
+                        "refusals": item["expected"] - item["successes"],
+                        "refusal_pct": _num(item["refusal_pct"], 3),
+                    })
+
+            method_results.append({
+                "name": method["name"],
+                "label": method["label"],
+                "settings": _method_settings(method),
+                "mean_absolute": summary["mean_absolute"],
+                "mean_normalized_pct": summary["mean_normalized_pct"],
+                "values_count": summary["values_count"],
+                "refusals": summary["refusals"],
+                "etalon_refusals": summary["etalon_refusals"],
+            })
+    except ValueError as exc:
+        say(f"Остановка: расчёт прерван ({exc}). §6 требует исправить "
+            f"программу до продолжения.")
+        _write_log(out_dir / "run_log.txt", log)
+        return 1
+
+    measurement_columns = [
+        "method", "method_label", "wave_index", "start_idx", "end_idx",
+        "has_diastolic_peak",
+        "etalon_p1", "etalon_A1", "etalon_t1", "etalon_p2", "etalon_A2",
+        "etalon_t2", "etalon_T",
+        "estimate_p1", "estimate_A1", "estimate_t1", "estimate_p2",
+        "estimate_A2", "estimate_t2", "estimate_T",
+        "refused_first", "refused_second", "second_required",
+        "abs_A1", "abs_t1", "abs_A2", "abs_t2",
+        "norm_A1", "norm_t1", "norm_A2", "norm_t2",
+    ]
+    _write_csv(out_dir / "measurements.csv", measurement_columns,
+               measurement_rows)
+    _write_csv(
+        out_dir / "errors.csv",
+        ["method", "method_label", "metric", "mean_absolute",
+         "mean_normalized_pct", "values_count"],
+        error_rows)
+    _write_csv(
+        out_dir / "refusals.csv",
+        ["source", "method", "peak", "expected", "successes", "refusals",
+         "refusal_pct"],
+        refusal_rows)
+
+    elapsed = time.perf_counter() - started
+    try:
+        data_dir_label = str(data_dir.relative_to(ROOT))
+    except ValueError:
+        data_dir_label = str(data_dir)
+    report = {
+        "stage": "test",
+        "status": "ok",
+        "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "git_commit": _git_commit(),
+        "dataset_version": DATASET_VERSION,
+        "data_dir": data_dir_label,
+        "fs_hz": FS_HZ,
+        "evaluation_window_sec": [EVAL_START_SEC, EVAL_END_SEC],
+        "test_input": {
+            "input_id": test_row.input_id,
+            "reference_id": test_row.reference_id,
+            "split": test_row.split,
+            "wave_class": test_row.wave_class,
+            "noise_repeat": test_row.noise_repeat,
+            "noisy_path": test_row.noisy_path,
+            "noisy_sha256": test_row.noisy_sha256,
+            "clean_path": clean_path.relative_to(data_dir).as_posix(),
+            "clean_sha256": clean_row.clean_sha256,
+            "annotation_sha256": test_row.annotation_sha256,
+        },
+        "waves": {
+            "total": len(waves),
+            "evaluated": selected,
+            "evaluated_with_second_peak": int(
+                np.count_nonzero(waves.has_diastolic_peak[mask])),
+        },
+        "methods": method_results,
+        "verifier": {"exit_code": verify_code, "result": verify_passed},
+        "environment": {
+            "python": platform.python_version(),
+            "packages": _package_versions(),
+        },
+        "elapsed_sec": round(elapsed, 2),
+    }
+    (out_dir / "run.json").write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8")
+    _write_test_summary(out_dir / "summary.md", report)
+    say(f"Измерения: {out_dir / 'measurements.csv'}")
+    say(f"Длительность этапа: {elapsed:.2f} с")
+    say("Итог: тестовый прогон завершён; отказы и ошибки записаны явно.")
+    _write_log(out_dir / "run_log.txt", log)
+    return 0
+
+
+def _write_test_summary(path: Path, report: dict) -> None:
+    test = report["test_input"]
+    waves = report["waves"]
+    lines = [
+        "# Тестовый прогон",
+        "",
+        f"Статус: **{report['status']}**. Сгенерировано "
+        f"{report['generated_at']}; коммит `{report['git_commit']}`.",
+        "",
+        f"Вход `{test['input_id']}`: эталон `{test['reference_id']}`, часть "
+        f"«{SPLIT_LABELS[test['split']]}», класс "
+        f"«{CLASS_LABELS[test['wave_class']]}», реализация "
+        f"№{test['noise_repeat']}.",
+        f"Окно оценки §2: {report['evaluation_window_sec'][0]:.0f}–"
+        f"{report['evaluation_window_sec'][1]:.0f} с; волн в разметке "
+        f"{waves['total']}, оценено {waves['evaluated']}, из них с вторым "
+        f"пиком {waves['evaluated_with_second_peak']}.",
+        "",
+        "## Нормированные ошибки (%, среднее по волнам)",
+        "",
+        "| Обработка | E(A1) | E(t1) | E(A2) | E(t2) |",
+        "|---|---|---|---|---|",
+    ]
+    for method in report["methods"]:
+        values = method["mean_normalized_pct"]
+        lines.append(
+            f"| {method['label']} | {_num(values['A1'], 3)} | "
+            f"{_num(values['t1'], 3)} | {_num(values['A2'], 3)} | "
+            f"{_num(values['t2'], 3)} |")
+    lines += [
+        "",
+        "## Абсолютные ошибки (условные единицы и мс)",
+        "",
+        "| Обработка | A1 | t1 | A2 | t2 |",
+        "|---|---|---|---|---|",
+    ]
+    for method in report["methods"]:
+        values = method["mean_absolute"]
+        lines.append(
+            f"| {method['label']} | {_num(values['A1'], 4)} | "
+            f"{_num(values['t1'], 3)} | {_num(values['A2'], 4)} | "
+            f"{_num(values['t2'], 3)} |")
+    lines += [
+        "",
+        "## Отказы измерителя",
+        "",
+        "| Обработка | Пик | Ожидалось | Успешно | Отказов | Доля, % |",
+        "|---|---|---|---|---|---|",
+    ]
+    for method in report["methods"]:
+        for peak, label in (("first_peak", "первый"),
+                            ("second_peak", "второй")):
+            item = method["refusals"][peak]
+            share = ("не применимо" if item["refusal_pct"] is None
+                     else _num(item["refusal_pct"], 3))
+            lines.append(
+                f"| {method['label']} | {label} | {item['expected']} | "
+                f"{item['successes']} | "
+                f"{item['expected'] - item['successes']} | {share} |")
+    etalon = report["methods"][0]["etalon_refusals"]
+    lines += [
+        "",
+        f"Отказы на чистом эталоне: первый пик — "
+        f"{etalon['first_peak']['expected'] - etalon['first_peak']['successes']} "
+        f"из {etalon['first_peak']['expected']}, второй — "
+        f"{etalon['second_peak']['expected'] - etalon['second_peak']['successes']} "
+        f"из {etalon['second_peak']['expected']}.",
+        "",
+        "Знаменатели средних и полные измерения по волнам — в "
+        "`measurements.csv` и `errors.csv`. Превосходство фильтра в тестовом "
+        "прогоне не требуется (§6); результаты не входят в итоговое "
+        "статистическое сравнение.",
+        "",
+        f"Верификатор: код {report['verifier']['exit_code']} "
+        f"({report['verifier']['result']}).",
+        f"Длительность этапа: {report['elapsed_sec']} с.",
+        "",
+    ]
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
 def _not_implemented(stage: str) -> int:
     print(f"Этап {stage!r} ещё не реализован. Сейчас доступен только "
           f"'prepare' (см. results/prepare/).")
@@ -508,12 +905,19 @@ def main(argv: list[str] | None = None) -> int:
     prepare.add_argument("--results-dir", type=Path,
                          default=ROOT / "results")
 
-    for name in ("test", "select", "main"):
+    test = subparsers.add_parser(
+        "test", help="тестовый прогон на одном входе (§6)")
+    test.add_argument("--data-dir", type=Path, default=ROOT / "data")
+    test.add_argument("--results-dir", type=Path, default=ROOT / "results")
+
+    for name in ("select", "main"):
         subparsers.add_parser(name, help=f"этап {name} (пока не реализован)")
 
     args = parser.parse_args(argv)
     if args.stage == "prepare":
         return run_prepare(args.data_dir.resolve(), args.results_dir.resolve())
+    if args.stage == "test":
+        return run_test(args.data_dir.resolve(), args.results_dir.resolve())
     return _not_implemented(args.stage)
 
 

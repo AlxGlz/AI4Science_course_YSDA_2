@@ -1,0 +1,199 @@
+{
+  "stage": "test",
+  "status": "ok",
+  "generated_at": "2026-11-09T17:03:56+02:00",
+  "git_commit": "897828b11ef3f2a6d9fe74b479f3ff896543e819",
+  "dataset_version": "vasotest-v2",
+  "data_dir": "data",
+  "fs_hz": 320.0,
+  "evaluation_window_sec": [
+    5.0,
+    55.0
+  ],
+  "test_input": {
+    "input_id": "08-1",
+    "reference_id": "08",
+    "split": "tune",
+    "wave_class": "clear",
+    "noise_repeat": 1,
+    "noisy_path": "noisy/08-1.csv",
+    "noisy_sha256": "8860cba3f35866fd9899c02aa6ba6fc1a6099b4d342dcf1dd1673be50dee222b",
+    "clean_path": "references/08.csv",
+    "clean_sha256": "42710aef28f7b28faa2868eb9881008131a9051e1851c045f06680da433bb262",
+    "annotation_sha256": "3395834f9e85d7cc49ad66f79877cfae6cc2724103a1d55584dc3e6411803c4f"
+  },
+  "waves": {
+    "total": 75,
+    "evaluated": 62,
+    "evaluated_with_second_peak": 62
+  },
+  "methods": [
+    {
+      "name": "raw",
+      "label": "сырой сигнал",
+      "settings": {
+        "kind": "raw"
+      },
+      "mean_absolute": {
+        "A1": 0.020621657689495015,
+        "t1": 3.4778225806451615,
+        "A2": 0.055151485075692445,
+        "t2": 9.425403225806452
+      },
+      "mean_normalized_pct": {
+        "A1": 1.1408859562640115,
+        "t1": 0.43815087630175265,
+        "A2": 3.0512365076263936,
+        "t2": 1.1874523749047499
+      },
+      "values_count": {
+        "A1": 62,
+        "t1": 62,
+        "A2": 62,
+        "t2": 62
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 62,
+          "successes": 62,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 62,
+          "successes": 62,
+          "refusal_pct": 0.0
+        }
+      },
+      "etalon_refusals": {
+        "first_peak": {
+          "expected": 62,
+          "successes": 62,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 62,
+          "successes": 62,
+          "refusal_pct": 0.0
+        }
+      }
+    },
+    {
+      "name": "moving_average_11",
+      "label": "скользящее среднее, окно 11",
+      "settings": {
+        "kind": "moving_average",
+        "window": 11
+      },
+      "mean_absolute": {
+        "A1": 0.022078439789401456,
+        "t1": 0.907258064516129,
+        "A2": 0.05422535661613544,
+        "t2": 6.350806451612903
+      },
+      "mean_normalized_pct": {
+        "A1": 1.221481913395368,
+        "t1": 0.11430022860045722,
+        "A2": 2.9999987764451963,
+        "t2": 0.8001016002032004
+      },
+      "values_count": {
+        "A1": 62,
+        "t1": 62,
+        "A2": 62,
+        "t2": 62
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 62,
+          "successes": 62,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 62,
+          "successes": 62,
+          "refusal_pct": 0.0
+        }
+      },
+      "etalon_refusals": {
+        "first_peak": {
+          "expected": 62,
+          "successes": 62,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 62,
+          "successes": 62,
+          "refusal_pct": 0.0
+        }
+      }
+    },
+    {
+      "name": "butterworth_0.30_8.0_N2",
+      "label": "Баттерворт N=2, 0,30–8 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.3,
+        "f_high_hz": 8.0,
+        "N": 2
+      },
+      "mean_absolute": {
+        "A1": 0.002236453191690223,
+        "t1": 0.0,
+        "A2": 0.004492788103047246,
+        "t2": 0.9576612903225806
+      },
+      "mean_normalized_pct": {
+        "A1": 0.12373098596923139,
+        "t1": 0.0,
+        "A2": 0.24856192108395686,
+        "t2": 0.1206502413004826
+      },
+      "values_count": {
+        "A1": 62,
+        "t1": 62,
+        "A2": 62,
+        "t2": 62
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 62,
+          "successes": 62,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 62,
+          "successes": 62,
+          "refusal_pct": 0.0
+        }
+      },
+      "etalon_refusals": {
+        "first_peak": {
+          "expected": 62,
+          "successes": 62,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 62,
+          "successes": 62,
+          "refusal_pct": 0.0
+        }
+      }
+    }
+  ],
+  "verifier": {
+    "exit_code": 0,
+    "result": "46 passed in 2.39s"
+  },
+  "environment": {
+    "python": "3.13.14",
+    "packages": {
+      "numpy": "2.5.2",
+      "scipy": "1.18.1",
+      "matplotlib": "3.11.2",
+      "statsmodels": "0.14.5",
+      "pytest": "9.1.1",
+      "hypothesis": "6.142.4"
+    }
+  },
+  "elapsed_sec": 6.32
+}
