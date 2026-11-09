@@ -44,6 +44,7 @@ REQUIRED_CODE: dict[str, tuple[str, ...]] = {
                        "etalon_refusal_summary"),
     "ppg.selection": ("is_admissible", "peak_score", "choose_butterworth",
                       "choose_moving_average", "count_admissible"),
+    "ppg.stats": ("holm_adjust", "paired_test", "family_p_values"),
 }
 
 # Обязательные проверки §5: строки таблицы и согласованные контрольные сигналы.

@@ -1,0 +1,13 @@
+method,method_label,kind,metric,mean_absolute,mean_normalized_pct,values_count
+raw,сырой сигнал,raw,A1,0.033406,3.450049,7885
+raw,сырой сигнал,raw,t1,7.523693,0.964938,7885
+raw,сырой сигнал,raw,A2,0.075324,7.530443,5250
+raw,сырой сигнал,raw,t2,29.339210,3.810401,5250
+moving_average_11,"скользящее среднее, окно 11",moving_average,A1,0.025421,2.466341,7885
+moving_average_11,"скользящее среднее, окно 11",moving_average,t1,3.993278,0.502007,7885
+moving_average_11,"скользящее среднее, окно 11",moving_average,A2,0.066077,6.491053,5250
+moving_average_11,"скользящее среднее, окно 11",moving_average,t2,17.867313,2.304535,5250
+butterworth_0.50_20.0_N4,"Баттерворт N=4, 0,50–20 Гц",butterworth,A1,0.005425,0.583828,7885
+butterworth_0.50_20.0_N4,"Баттерворт N=4, 0,50–20 Гц",butterworth,t1,3.044343,0.377960,7885
+butterworth_0.50_20.0_N4,"Баттерворт N=4, 0,50–20 Гц",butterworth,A2,0.006104,0.663322,5249
+butterworth_0.50_20.0_N4,"Баттерворт N=4, 0,50–20 Гц",butterworth,t2,13.871115,1.813268,5249

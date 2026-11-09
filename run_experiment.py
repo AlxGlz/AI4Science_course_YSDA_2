@@ -1,23 +1,25 @@
 """Этапы эксперимента §6 методики.
 
 Реализованы этапы ``prepare`` (проверка данных и верификатора, план расчётов),
-и ``test`` (однократный прогон на одном входе) и ``select`` (подбор
-параметров на данных для подбора); ``main`` пока не реализован.
+``test`` (однократный прогон на одном входе), ``select`` (подбор параметров
+на данных для подбора) и ``main`` (итоговое сравнение по §7.5–§7.6).
 
 Команды (из корня проекта):
 
     Windows: ``.\\venv\\Scripts\\python.exe run_experiment.py prepare``
              ``.\\venv\\Scripts\\python.exe run_experiment.py test``
              ``.\\venv\\Scripts\\python.exe run_experiment.py select``
+             ``.\\venv\\Scripts\\python.exe run_experiment.py main``
     macOS:   ``./.venv/bin/python run_experiment.py prepare``
              ``./.venv/bin/python run_experiment.py test``
              ``./.venv/bin/python run_experiment.py select``
+             ``./.venv/bin/python run_experiment.py main``
 
 Данные: ``data/manifest.csv``, ``data/references/``, ``data/noisy/``,
 ``data/annotations/``; чтение — через ``ppg.io``, вычисления — через
-``ppg.experiment``, ``ppg.filters``, ``ppg.measure``, ``ppg.metrics``, ``ppg.methods``, ``ppg.selection``.
+``ppg.experiment``, ``ppg.filters``, ``ppg.measure``, ``ppg.metrics``, ``ppg.methods``, ``ppg.selection``, ``ppg.stats``.
 Проверка: ``verify.py`` (запускается этим скриптом первым шагом).
-Используется в: этап ``main`` после фиксации настроек.
+Используется в: команды этапов §6 из корня проекта.
 """
 
 from __future__ import annotations
@@ -63,12 +65,14 @@ from ppg.filters import butter_bandpass, moving_average  # noqa: E402
 from ppg.measure import FS_DEFAULT  # noqa: E402
 from ppg.methods import apply_method, method_settings  # noqa: E402
 from ppg.selection import (  # noqa: E402
+    FIRST_PEAK_LIMIT_PCT,
     choose_butterworth,
     choose_moving_average,
     count_admissible,
     is_admissible,
     peak_score,
 )
+from ppg.stats import family_p_values, holm_adjust, paired_test  # noqa: E402
 from ppg.metrics import ABS_KEYS, nested_mean, refusal_stats  # noqa: E402
 
 FILTER_LOW_HZ = (0.10, 0.30, 0.50)
@@ -900,6 +904,9 @@ def _cell(value: float | None, digits: int = 3) -> str:
 
 
 SELECT_SPLIT = "tune"
+HOLDOUT_SPLIT = "holdout"
+ALPHA = 0.05
+SECOND_PEAK_METRICS = ("A2", "t2")
 
 
 def select_methods() -> list[dict[str, object]]:
@@ -951,22 +958,22 @@ def _check_sha(path: Path, expected: str, label: str) -> None:
         raise ValueError(f"SHA-256 {label} не совпал с манифестом")
 
 
-def _load_select_inputs(dataset) -> dict[str, dict[str, object]]:
-    """24 эталона части tune и их 120 шумовых входов с проверкой SHA (§6)."""
-    rows = [row for row in dataset.rows if row.split == SELECT_SPLIT]
+def _load_split_inputs(dataset, split: str) -> dict[str, dict[str, object]]:
+    """24 эталона одной части набора и их 120 шумовых входов с проверкой SHA (§6)."""
+    rows = [row for row in dataset.rows if row.split == split]
     reference_ids = sorted({row.reference_id for row in rows}, key=natural_key)
     expected_inputs = EXPECTED_PER_SPLIT * 5
     if len(reference_ids) != EXPECTED_PER_SPLIT or len(rows) != expected_inputs:
         raise ValueError(
-            f"в части {SELECT_SPLIT}: эталонов {len(reference_ids)} "
+            f"в части {split}: эталонов {len(reference_ids)} "
             f"(ожидалось {EXPECTED_PER_SPLIT}), входов {len(rows)} "
             f"(ожидалось {expected_inputs})")
     loaded: dict[str, dict[str, object]] = {}
     for reference_id in reference_ids:
         reference = dataset.references[reference_id]
-        if any(row.split != SELECT_SPLIT for row in reference.inputs):
+        if any(row.split != split for row in reference.inputs):
             raise ValueError(f"эталон {reference_id}: есть входы вне части "
-                             f"{SELECT_SPLIT}")
+                             f"{split}")
         _check_sha(reference.clean_path, reference.inputs[0].clean_sha256,
                    f"чистого эталона {reference_id}")
         inputs = sorted(reference.inputs, key=lambda row: row.noise_repeat)
@@ -1061,7 +1068,7 @@ def run_select(data_dir: Path, results_dir: Path) -> int:
 
     try:
         dataset = load_dataset(data_dir)
-        loaded = _load_select_inputs(dataset)
+        loaded = _load_split_inputs(dataset, SELECT_SPLIT)
     except (FileNotFoundError, ValueError) as exc:
         say(f"Подбор остановлен: данные не готовы: {exc}")
         _write_log(out_dir / "run_log.txt", log)
@@ -1534,10 +1541,814 @@ def _write_select_summary(path: Path, report: dict) -> None:
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def _not_implemented(stage: str) -> int:
-    print(f"Этап {stage!r} ещё не реализован. Доступны этапы "
-          f"'prepare', 'test' и 'select' (см. results/).")
-    return 3
+def _read_selection(path: Path) -> dict[str, object]:
+    """Раздел ``selection`` этапа ``select``: настройки §7.4 без повторного подбора."""
+    if not path.exists():
+        raise ValueError(f"нет {path}: сначала выполните этап select (§6)")
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{path}: повреждён run.json ({exc})") from exc
+    if not isinstance(report.get("selection"), dict):
+        raise ValueError(f"{path}: нет раздела selection")
+    return report
+
+
+def _ensure_settings_committed(path: Path) -> str:
+    """§7.4: настройки подбора зафиксированы коммитом до расчёта ``main``."""
+    try:
+        relative = path.resolve().relative_to(ROOT).as_posix()
+    except ValueError as exc:
+        raise ValueError(
+            f"{path} вне проекта: фиксацию настроек проверить нельзя") from exc
+    tracked = subprocess.run(
+        ["git", "ls-files", "--error-unmatch", relative],
+        cwd=str(ROOT), capture_output=True, text=True)
+    if tracked.returncode != 0:
+        raise ValueError(f"§7.4: {relative} не отслеживается Git")
+    changed = subprocess.run(
+        ["git", "diff", "--quiet", "HEAD", "--", relative],
+        cwd=str(ROOT), capture_output=True, text=True)
+    if changed.returncode != 0:
+        raise ValueError(f"§7.4: {relative} изменён после коммита")
+    last = subprocess.run(
+        ["git", "log", "-1", "--format=%H", "--", relative],
+        cwd=str(ROOT), capture_output=True, text=True)
+    return last.stdout.strip() if last.returncode == 0 else "неизвестен"
+
+
+def _chosen_methods(selection: dict[str, object]) -> list[dict[str, object]]:
+    """Обработки, зафиксированные подбором: сырой сигнал, среднее, Баттерворт."""
+    chosen = selection.get("chosen") or {}
+    if not isinstance(chosen, dict):
+        raise ValueError("в selection нет раздела chosen")
+    methods: list[dict[str, object]] = []
+    for key in ("raw", "moving_average", "butterworth"):
+        item = chosen.get(key)
+        if not isinstance(item, dict):
+            continue
+        methods.append({
+            "name": item["name"],
+            "label": item["label"],
+            **item["settings"],
+        })
+    if not methods:
+        raise ValueError("в selection нет выбранных обработок")
+    return methods
+
+
+def _evaluate_method(method: dict[str, object], loaded,
+                     etalon_totals=None) -> dict[str, object]:
+    """Ошибки, отказы и средние по эталонам одной обработки (§2, §7.5)."""
+    norm_groups: dict[str, dict[str, dict[str, list]]] = {}
+    abs_groups: dict[str, dict[str, dict[str, list]]] = {}
+    totals = {"first": [0, 0], "second": [0, 0]}
+    reference_totals: dict[str, dict[str, list[int]]] = {}
+    for reference_id, item in loaded.items():
+        norm_ref = norm_groups.setdefault(reference_id, {})
+        abs_ref = abs_groups.setdefault(reference_id, {})
+        ref_totals = {"first": [0, 0], "second": [0, 0]}
+        for row in item["rows"]:
+            processed = apply_method(item["signals"][row.input_id], method,
+                                     fs=FS_HZ)
+            comparisons = compare_waves(item["waves"], item["clean"],
+                                        processed, item["mask"], fs=FS_HZ)
+            normalized = error_series(comparisons, normalized=True)
+            absolute = error_series(comparisons)
+            norm_input = norm_ref.setdefault(row.input_id, {})
+            abs_input = abs_ref.setdefault(row.input_id, {})
+            for key in ABS_KEYS:
+                norm_input.setdefault(key, []).extend(normalized[key])
+                abs_input.setdefault(key, []).extend(absolute[key])
+            refusals = refusal_summary(comparisons)
+            for peak in ("first", "second"):
+                stats = refusals[f"{peak}_peak"]
+                for target in (totals, ref_totals):
+                    target[peak][0] += stats["expected"]
+                    target[peak][1] += stats["successes"]
+            if etalon_totals is not None:
+                reference_stats = etalon_refusal_summary(comparisons)
+                for peak in ("first", "second"):
+                    stats = reference_stats[f"{peak}_peak"]
+                    etalon_totals[peak][0] += stats["expected"]
+                    etalon_totals[peak][1] += stats["successes"]
+        reference_totals[reference_id] = ref_totals
+    entry = _select_summary(method, norm_groups, abs_groups, totals)
+    entry["score_pct"] = peak_score(entry)
+    return {
+        "entry": entry,
+        "reference_means": _reference_means(norm_groups, abs_groups),
+        "reference_totals": reference_totals,
+    }
+
+
+def _reference_means(norm_groups, abs_groups) -> dict[str, dict[str, object]]:
+    """Средние ошибки по эталону после усреднения по волнам и повторам (§7.5)."""
+    means: dict[str, dict[str, object]] = {}
+    for reference_id, inputs in norm_groups.items():
+        abs_inputs = abs_groups[reference_id]
+        means[reference_id] = {
+            "mean_normalized_pct": {
+                key: _nested_error({reference_id: inputs}, key)
+                for key in ABS_KEYS},
+            "mean_absolute": {
+                key: _nested_error({reference_id: abs_inputs}, key)
+                for key in ABS_KEYS},
+            "values_count": {
+                key: _error_count({reference_id: inputs}, key)
+                for key in ABS_KEYS},
+        }
+    return means
+
+
+def _paired_comparison(candidate: dict[str, object],
+                       baseline: dict[str, object], metric: str,
+                       pairs_expected: list[str]) -> dict[str, object]:
+    """Парное сравнение ошибки второго пика по эталонам с полными измерениями."""
+    candidate_means = candidate["reference_means"]
+    baseline_means = baseline["reference_means"]
+    candidate_totals = candidate["reference_totals"]
+    baseline_totals = baseline["reference_totals"]
+    used: list[str] = []
+    excluded: list[str] = []
+    for reference_id in pairs_expected:
+        complete = (
+            candidate_totals[reference_id]["second"][0]
+            == candidate_totals[reference_id]["second"][1]
+            and baseline_totals[reference_id]["second"][0]
+            == baseline_totals[reference_id]["second"][1]
+            and candidate_means[reference_id]["mean_normalized_pct"][metric]
+            is not None
+            and baseline_means[reference_id]["mean_normalized_pct"][metric]
+            is not None)
+        (used if complete else excluded).append(reference_id)
+
+    baseline_values = [baseline_means[reference_id][
+        "mean_normalized_pct"][metric] for reference_id in used]
+    candidate_values = [candidate_means[reference_id][
+        "mean_normalized_pct"][metric] for reference_id in used]
+    test = paired_test(baseline_values, candidate_values,
+                       alternative="greater")
+    absolute_differences = [
+        baseline_means[reference_id]["mean_absolute"][metric]
+        - candidate_means[reference_id]["mean_absolute"][metric]
+        for reference_id in used]
+    metadata = _comparison_metadata(metric)
+    performed = test["p_value"] is not None
+    item: dict[str, object] = {
+        "id": f"{metric}_{candidate['entry']['name']}_vs_"
+              f"{baseline['entry']['name']}",
+        "metric": metric,
+        "metric_label": metadata["label"],
+        "unit": metadata["unit"],
+        "baseline": baseline["entry"]["name"],
+        "baseline_label": baseline["entry"]["label"],
+        "candidate": candidate["entry"]["name"],
+        "candidate_label": candidate["entry"]["label"],
+        "pairs_expected": len(pairs_expected),
+        "pairs_used": len(used),
+        "excluded": excluded,
+        "mean_difference_pct": test["mean_difference"],
+        "mean_absolute_difference": (
+            sum(absolute_differences) / len(absolute_differences)
+            if absolute_differences else None),
+        "statistic": test["statistic"],
+        "p_value": test["p_value"],
+        "status": "выполнено" if performed else "не выполнено",
+    }
+    if not performed:
+        item["note"] = ("меньше двух полных пар: сравнение невыполнимо (§7.5)")
+    return item
+
+
+def _comparison_metadata(metric: str) -> dict[str, str]:
+    if metric == "A2":
+        return {"label": "амплитуда второго пика", "unit": "усл. ед."}
+    if metric == "t2":
+        return {"label": "время второго пика", "unit": "мс"}
+    raise ValueError(f"сравнение первого пика не предусмотрено §7.5: {metric!r}")
+
+
+def _missing_comparison(candidate: dict[str, object], kind: str,
+                        metric: str) -> dict[str, object]:
+    """Невыполненное сравнение §7.7: допустимое среднее не найдено."""
+    metadata = _comparison_metadata(metric)
+    return {
+        "id": f"{metric}_{candidate['entry']['name']}_vs_{kind}",
+        "metric": metric,
+        "metric_label": metadata["label"],
+        "unit": metadata["unit"],
+        "baseline": kind,
+        "baseline_label": "скользящее среднее",
+        "candidate": candidate["entry"]["name"],
+        "candidate_label": candidate["entry"]["label"],
+        "pairs_expected": 0,
+        "pairs_used": 0,
+        "excluded": [],
+        "mean_difference_pct": None,
+        "mean_absolute_difference": None,
+        "statistic": None,
+        "p_value": None,
+        "status": "не выполнено",
+        "note": ("§7.7: допустимое среднее не найдено, сравнение "
+                 "не выполняется; в поправку Холма подставлена 1"),
+    }
+
+
+def _p_value(value: float | None, digits: int = 4) -> str:
+    if value is None:
+        return "—"
+    threshold = 10.0 ** (-digits)
+    if value < threshold:
+        return f"< {threshold:.{digits}f}"
+    return f"{value:.{digits}f}"
+
+
+def _main_conclusion(by_kind, comparisons) -> dict[str, object]:
+    """Итоговый вывод по §7.6: три уровня и перечень условий."""
+    butterworth = by_kind["butterworth"]["entry"]
+    values = butterworth["mean_normalized_pct"]
+    refusals = butterworth["refusals"]
+    refusals_first = (refusals["first_peak"]["expected"]
+                      - refusals["first_peak"]["successes"])
+    refusals_second = (refusals["second_peak"]["expected"]
+                       - refusals["second_peak"]["successes"])
+    no_refusals = refusals_first == 0 and refusals_second == 0
+    first_peak_ok = (values["A1"] is not None and values["t1"] is not None
+                     and values["A1"] <= FIRST_PEAK_LIMIT_PCT
+                     and values["t1"] <= FIRST_PEAK_LIMIT_PCT)
+    significant = [item for item in comparisons if item["significant"]]
+    all_four = len([item for item in comparisons
+                    if item["status"] == "выполнено"
+                    and item["significant"]]) == 4
+
+    conditions = [
+        {
+            "name": "нет отказов у Баттерворта ни на одном пике",
+            "value": (f"первый: {refusals_first}, второй: {refusals_second}"),
+            "passed": no_refusals,
+        },
+        {
+            "name": f"E(A1) не больше {FIRST_PEAK_LIMIT_PCT:g} %",
+            "value": _num(values["A1"], 3),
+            "passed": values["A1"] is not None
+                      and values["A1"] <= FIRST_PEAK_LIMIT_PCT,
+        },
+        {
+            "name": f"E(t1) не больше {FIRST_PEAK_LIMIT_PCT:g} %",
+            "value": _num(values["t1"], 3),
+            "passed": values["t1"] is not None
+                      and values["t1"] <= FIRST_PEAK_LIMIT_PCT,
+        },
+        {
+            "name": ("все четыре сравнения показывают улучшение после "
+                     "поправки Холма"),
+            "value": f"{len(significant)} из 4",
+            "passed": all_four,
+        },
+    ]
+
+    if no_refusals and first_peak_ok and all_four:
+        level = "полное подтверждение гипотезы"
+        text = ("Отказов у выбранного Баттерворта нет, средние ошибки первого "
+                "пика не превышают 5 %, все четыре сравнения показывают "
+                "улучшение после поправки Холма.")
+    elif significant:
+        level = "частичное улучшение"
+        missing = [item["name"] for item in conditions if not item["passed"]]
+        text = (f"Выполнены не все условия §7.6; не выполнено: "
+                f"{'; '.join(missing)}. Значимое улучшение после поправки "
+                f"Холма есть в {len(significant)} из 4 сравнений.")
+    else:
+        level = "отсутствие подтверждения"
+        text = ("Ни одно из четырёх сравнений не показало значимого улучшения "
+                "после поправки Холма; отсутствие значимости не означает "
+                "равенства методов (§7.7).")
+    return {
+        "level": level,
+        "full_confirmation": bool(no_refusals and first_peak_ok and all_four),
+        "text": text,
+        "conditions": conditions,
+        "note": ("Статистическая значимость сама по себе не означает "
+                 "практической важности (§7.5)."),
+    }
+
+
+def run_main(data_dir: Path, results_dir: Path) -> int:
+    """Этап ``main``: зафиксированные обработки на данных проверки (§6, §7.5)."""
+    started = time.perf_counter()
+    out_dir = results_dir / "main"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    log: list[str] = []
+
+    def say(message: str = "") -> None:
+        print(message)
+        log.append(message)
+
+    say("run_experiment.py main — сравнение обработок на данных проверки "
+        "(§6, §7.5–§7.7)")
+    say(f"Каталог данных: {data_dir}")
+    say(f"Каталог результатов: {out_dir}")
+
+    selection_path = results_dir / "select" / "run.json"
+    try:
+        select_report = _read_selection(selection_path)
+        settings_commit = _ensure_settings_committed(selection_path)
+    except ValueError as exc:
+        say(f"Прогон остановлен: {exc}")
+        _write_log(out_dir / "run_log.txt", log)
+        return 1
+
+    selection = select_report["selection"]
+    termination = selection.get("termination") or {}
+    try:
+        relative_selection = selection_path.resolve().relative_to(ROOT).as_posix()
+    except ValueError:
+        relative_selection = str(selection_path)
+    say(f"§7.4: настройки взяты из {relative_selection} и зафиксированы "
+        f"коммитом {settings_commit}.")
+
+    if not termination.get("butterworth_found"):
+        say("§7.7: допустимый Баттерворт не найден; основной прогон "
+            "не выполняется, итогом остаётся таблица подбора.")
+        _write_log(out_dir / "run_log.txt", log)
+        return 0
+
+    verify_code, verify_passed = _run_verifier(out_dir, say)
+    if verify_code != 0:
+        say("Прогон остановлен: верификатор не прошёл.")
+        _write_log(out_dir / "run_log.txt", log)
+        return verify_code
+
+    try:
+        dataset = load_dataset(data_dir)
+        loaded = _load_split_inputs(dataset, HOLDOUT_SPLIT)
+        methods = _chosen_methods(selection)
+    except (FileNotFoundError, ValueError) as exc:
+        say(f"Прогон остановлен: данные или настройки не готовы: {exc}")
+        _write_log(out_dir / "run_log.txt", log)
+        return 1
+
+    reference_ids = list(loaded)
+    second_peak_ids = sorted(
+        (reference_id for reference_id in reference_ids
+         if dataset.references[reference_id].wave_class != "absent"),
+        key=natural_key)
+    if len(second_peak_ids) != 16:
+        say(f"Прогон остановлен: эталонов с размеченным вторым пиком "
+            f"{len(second_peak_ids)}, ожидалось 16 (§7.5).")
+        _write_log(out_dir / "run_log.txt", log)
+        return 1
+
+    waves_total = sum(len(item["waves"]) for item in loaded.values())
+    waves_evaluated = sum(int(item["mask"].sum()) for item in loaded.values())
+    waves_second = sum(
+        int(item["waves"].has_diastolic_peak[item["mask"]].sum())
+        for item in loaded.values())
+    inputs_total = sum(len(item["rows"]) for item in loaded.values())
+    say(f"Часть «{SPLIT_LABELS[HOLDOUT_SPLIT]}»: эталонов {len(reference_ids)}, "
+        f"шумовых входов {inputs_total}, из них с вторым пиком "
+        f"{len(second_peak_ids)} эталонов; обработок {len(methods)}.")
+    say(f"Волн: всего {waves_total}, в окне оценки {waves_evaluated}, "
+        f"с вторым пиком {waves_second}.")
+
+    by_name: dict[str, dict[str, object]] = {}
+    by_kind: dict[str, dict[str, object]] = {}
+    etalon_totals = {"first": [0, 0], "second": [0, 0]}
+    try:
+        for index, method in enumerate(methods):
+            method_started = time.perf_counter()
+            evaluated = _evaluate_method(
+                method, loaded,
+                etalon_totals=etalon_totals if index == 0 else None)
+            evaluated["entry"]["elapsed_sec"] = round(
+                time.perf_counter() - method_started, 2)
+            by_name[method["name"]] = evaluated
+            by_kind[method["kind"]] = evaluated
+            values = evaluated["entry"]["mean_normalized_pct"]
+            refusals = evaluated["entry"]["refusals"]
+            say(f"{evaluated['entry']['label']}: "
+                f"E_A1 {_cell(values['A1'])} %, E_t1 {_cell(values['t1'])} %, "
+                f"E_A2 {_cell(values['A2'])} %, "
+                f"E_t2 {_cell(values['t2'])} %; отказы "
+                f"{refusals['first_peak']['expected'] - refusals['first_peak']['successes']}"
+                f"/{refusals['second_peak']['expected'] - refusals['second_peak']['successes']}")
+    except ValueError as exc:
+        say(f"Остановка: расчёт прерван ({exc}). §6 требует исправить "
+            f"программу до продолжения.")
+        _write_log(out_dir / "run_log.txt", log)
+        return 1
+
+    candidate = by_kind["butterworth"]
+    comparisons: list[dict[str, object]] = []
+    for kind, metric in (("raw", "A2"), ("raw", "t2"),
+                         ("moving_average", "A2"), ("moving_average", "t2")):
+        if kind in by_kind:
+            comparisons.append(_paired_comparison(
+                candidate, by_kind[kind], metric, second_peak_ids))
+        else:
+            comparisons.append(_missing_comparison(candidate, kind, metric))
+
+    adjusted = holm_adjust(family_p_values(comparisons))
+    for item, p_holm in zip(comparisons, adjusted):
+        item["p_holm"] = p_holm
+        item["significant"] = (
+            item["status"] == "выполнено"
+            and p_holm < ALPHA
+            and float(item["mean_difference_pct"] or 0.0) > 0.0)
+        if item["status"] != "выполнено":
+            item["decision"] = "не выполнено"
+        elif item["significant"]:
+            item["decision"] = "улучшение"
+        else:
+            item["decision"] = "нет значимого улучшения"
+
+    conclusion = _main_conclusion(by_kind, comparisons)
+    conclusion["incomplete_references"] = sorted(
+        (reference_id for reference_id in second_peak_ids
+         if by_kind["butterworth"]["reference_totals"][reference_id][
+             "second"][0]
+         != by_kind["butterworth"]["reference_totals"][reference_id][
+             "second"][1]),
+        key=natural_key)
+    if "moving_average" not in by_kind:
+        conclusion["text"] += (" Допустимое среднее не найдено, поэтому "
+                               "сравнения с ним не выполнялись (§7.7).")
+
+    chosen_scores: dict[str, object] = {}
+    for item in (selection.get("chosen") or {}).values():
+        if isinstance(item, dict):
+            chosen_scores[item.get("name")] = item.get("score_pct")
+
+    method_entries: list[dict[str, object]] = []
+    for method in methods:
+        entry = dict(by_name[method["name"]]["entry"])
+        entry["select_score_pct"] = chosen_scores.get(entry["name"])
+        method_entries.append(entry)
+
+    error_rows: list[dict[str, object]] = []
+    refusal_rows: list[dict[str, object]] = []
+    reference_rows: list[dict[str, object]] = []
+    for entry in method_entries:
+        evaluation = by_name[entry["name"]]
+        for key in ABS_KEYS:
+            error_rows.append({
+                "method": entry["name"],
+                "method_label": entry["label"],
+                "kind": entry["settings"].get("kind"),
+                "metric": key,
+                "mean_absolute": _num(entry["mean_absolute"][key]),
+                "mean_normalized_pct": _num(
+                    entry["mean_normalized_pct"][key]),
+                "values_count": entry["values_count"][key],
+            })
+        for peak, peak_label in (("first_peak", "первый"),
+                                 ("second_peak", "второй")):
+            stats = entry["refusals"][peak]
+            refusal_rows.append({
+                "method": entry["name"],
+                "method_label": entry["label"],
+                "kind": entry["settings"].get("kind"),
+                "peak": peak_label,
+                "expected": stats["expected"],
+                "successes": stats["successes"],
+                "refusals": stats["expected"] - stats["successes"],
+                "refusal_pct": _num(stats["refusal_pct"]),
+            })
+        means = evaluation["reference_means"]
+        totals = evaluation["reference_totals"]
+        for reference_id in reference_ids:
+            reference = dataset.references[reference_id]
+            for key in ABS_KEYS:
+                peak_totals = (totals[reference_id]["second"]
+                               if key in SECOND_PEAK_METRICS
+                               else totals[reference_id]["first"])
+                reference_rows.append({
+                    "method": entry["name"],
+                    "method_label": entry["label"],
+                    "reference_id": reference_id,
+                    "wave_class": reference.wave_class,
+                    "wave_class_label": CLASS_LABELS[reference.wave_class],
+                    "metric": key,
+                    "mean_absolute": _num(means[reference_id][
+                        "mean_absolute"][key]),
+                    "mean_normalized_pct": _num(means[reference_id][
+                        "mean_normalized_pct"][key]),
+                    "values_count": means[reference_id]["values_count"][key],
+                    "expected": peak_totals[0],
+                    "successes": peak_totals[1],
+                    "complete": int(peak_totals[0] == peak_totals[1]),
+                })
+
+    comparison_rows: list[dict[str, object]] = []
+    for item in comparisons:
+        comparison_rows.append({
+            "comparison": item["id"],
+            "metric": item["metric"],
+            "metric_label": item["metric_label"],
+            "baseline": item["baseline"],
+            "baseline_label": item["baseline_label"],
+            "candidate": item["candidate"],
+            "candidate_label": item["candidate_label"],
+            "unit": item["unit"],
+            "pairs_expected": item["pairs_expected"],
+            "pairs_used": item["pairs_used"],
+            "excluded": " ".join(item["excluded"]),
+            "mean_difference_pct": _num(item["mean_difference_pct"]),
+            "mean_absolute_difference": _num(
+                item["mean_absolute_difference"]),
+            "statistic": _num(item["statistic"]),
+            "p_value": _num(item["p_value"]),
+            "p_holm": _num(item["p_holm"]),
+            "alpha": ALPHA,
+            "significant": int(item["significant"]),
+            "status": item["status"],
+            "decision": item["decision"],
+        })
+
+    _write_csv(
+        out_dir / "errors.csv",
+        ["method", "method_label", "kind", "metric", "mean_absolute",
+         "mean_normalized_pct", "values_count"],
+        error_rows)
+    _write_csv(
+        out_dir / "refusals.csv",
+        ["method", "method_label", "kind", "peak", "expected", "successes",
+         "refusals", "refusal_pct"],
+        refusal_rows)
+    _write_csv(
+        out_dir / "by_reference.csv",
+        ["method", "method_label", "reference_id", "wave_class",
+         "wave_class_label", "metric", "mean_absolute", "mean_normalized_pct",
+         "values_count", "expected", "successes", "complete"],
+        reference_rows)
+    _write_csv(
+        out_dir / "comparisons.csv",
+        ["comparison", "metric", "metric_label", "baseline", "baseline_label",
+         "candidate", "candidate_label", "unit", "pairs_expected",
+         "pairs_used", "excluded", "mean_difference_pct",
+         "mean_absolute_difference", "statistic", "p_value", "p_holm",
+         "alpha", "significant", "status", "decision"],
+        comparison_rows)
+
+    elapsed = time.perf_counter() - started
+    try:
+        data_dir_label = str(data_dir.relative_to(ROOT))
+    except ValueError:
+        data_dir_label = str(data_dir)
+    report = {
+        "stage": "main",
+        "status": "ok",
+        "generated_at": datetime.now().astimezone().isoformat(
+            timespec="seconds"),
+        "git_commit": _git_commit(),
+        "dataset_version": DATASET_VERSION,
+        "data_dir": data_dir_label,
+        "fs_hz": FS_HZ,
+        "evaluation_window_sec": [EVAL_START_SEC, EVAL_END_SEC],
+        "split": HOLDOUT_SPLIT,
+        "settings_from_select": {
+            "path": relative_selection,
+            "settings_commit": settings_commit,
+            "run_commit": select_report.get("git_commit"),
+            "checked": "файл отслеживается Git и не изменён после коммита",
+            "moving_average_found": "moving_average" in by_kind,
+        },
+        "counts": {
+            "references": len(reference_ids),
+            "inputs": inputs_total,
+            "methods": len(methods),
+            "second_peak_references": len(second_peak_ids),
+        },
+        "waves": {
+            "total": waves_total,
+            "evaluated": waves_evaluated,
+            "evaluated_with_second_peak": waves_second,
+        },
+        "etalon_refusals": {
+            "first_peak": refusal_stats(*etalon_totals["first"]),
+            "second_peak": refusal_stats(*etalon_totals["second"]),
+        },
+        "methods": method_entries,
+        "candidates": method_entries,
+        "statistics": {
+            "rule": "§7.5",
+            "test": "односторонний парный t-тест, разность база − обработка",
+            "alternative": "greater",
+            "unit": ("эталон после усреднения ошибок по волнам и пяти "
+                     "реализациям"),
+            "pair_count": len(second_peak_ids),
+            "family_size": len(comparisons),
+            "correction": "holm",
+            "alpha": ALPHA,
+            "missing_p_value": 1.0,
+            "comparisons": comparisons,
+        },
+        "conclusion": conclusion,
+        "evaluated_inputs": sorted(
+            (row.input_id for item in loaded.values() for row in item["rows"]),
+            key=natural_key),
+        "verifier": {"exit_code": verify_code, "result": verify_passed},
+        "environment": {
+            "python": platform.python_version(),
+            "packages": _package_versions(),
+        },
+        "elapsed_sec": round(elapsed, 2),
+    }
+    (out_dir / "run.json").write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8")
+    _write_main_summary(out_dir / "summary.md", report)
+
+    say("")
+    say("Парные сравнения второго пика (§7.5):")
+    for item in comparisons:
+        difference = ("—" if item["mean_difference_pct"] is None
+                      else f"{item['mean_difference_pct']:.3f} п.п.")
+        say(f"  {item['candidate_label']} против базы "
+            f"«{item['baseline_label']}», "
+            f"{item['metric_label']}: пар {item['pairs_used']}, разность "
+            f"{difference}, p {_p_value(item['p_value'])}, "
+            f"p Холма {_p_value(item['p_holm'])} — {item['decision']}")
+    say(f"Итог §7.6: {conclusion['level']}.")
+    say(f"Длительность этапа: {elapsed:.2f} с")
+    _write_log(out_dir / "run_log.txt", log)
+    return 0
+
+
+def _write_main_summary(path: Path, report: dict) -> None:
+    selection = report["settings_from_select"]
+    counts = report["counts"]
+    waves = report["waves"]
+    statistics_section = report["statistics"]
+    conclusion = report["conclusion"]
+    lines = [
+        "# Основной прогон",
+        "",
+        f"Статус: **{report['status']}**. Сгенерировано "
+        f"{report['generated_at']}; коммит `{report['git_commit']}`.",
+        "",
+        f"Часть выборки: «{SPLIT_LABELS[report['split']]}» — "
+        f"{counts['references']} "
+        f"{_plural(counts['references'], 'эталон', 'эталона', 'эталонов')}, "
+        f"{counts['inputs']} "
+        f"{_plural(counts['inputs'], 'шумовой вход', 'шумовых входа', 'шумовых входов')}.",
+        f"Настройки взяты из `{selection['path']}` и зафиксированы "
+        f"коммитом `{selection['settings_commit']}`; "
+        f"{selection['checked']}, повторный подбор на этой части "
+        f"не выполняется (§7.4).",
+        f"Окно оценки §2: {report['evaluation_window_sec'][0]:.0f}–"
+        f"{report['evaluation_window_sec'][1]:.0f} с; волн в разметке "
+        f"{waves['total']}, оценено {waves['evaluated']}, из них с вторым "
+        f"пиком {waves['evaluated_with_second_peak']}. Эталонов с "
+        f"размеченным вторым пиком: {counts['second_peak_references']} — "
+        f"это число пар для сравнений второго пика (§7.5).",
+        "",
+        "## Настройки обработок",
+        "",
+        "| Обработка | Настройки | Оценка подбора, % |",
+        "|---|---|---|",
+    ]
+    for method in report["methods"]:
+        score = method.get("select_score_pct")
+        score_text = "—" if score is None else _num(score, 3)
+        lines.append(
+            f"| {method['label']} | {settings_label(method['settings'])} | "
+            f"{score_text} |")
+    lines += [
+        "",
+        "## Нормированные ошибки на итоговой выборке (%, среднее §2)",
+        "",
+        "| Обработка | E(A1) | E(t1) | E(A2) | E(t2) |",
+        "|---|---|---|---|---|",
+    ]
+    for method in report["methods"]:
+        values = method["mean_normalized_pct"]
+        lines.append(
+            f"| {method['label']} | {_num(values['A1'], 3)} | "
+            f"{_num(values['t1'], 3)} | {_num(values['A2'], 3)} | "
+            f"{_num(values['t2'], 3)} |")
+    lines += [
+        "",
+        "Ошибки первого пика посчитаны по всем эталонам части, второго — "
+        "только по эталонам и волнам с размеченным пиком (§2).",
+        "",
+        "## Абсолютные ошибки (условные единицы и мс)",
+        "",
+        "| Обработка | A1 | t1 | A2 | t2 |",
+        "|---|---|---|---|---|",
+    ]
+    for method in report["methods"]:
+        values = method["mean_absolute"]
+        lines.append(
+            f"| {method['label']} | {_num(values['A1'], 4)} | "
+            f"{_num(values['t1'], 3)} | {_num(values['A2'], 4)} | "
+            f"{_num(values['t2'], 3)} |")
+    lines += [
+        "",
+        "## Отказы измерителя",
+        "",
+        "| Обработка | Пик | Ожидалось | Успешно | Отказов | Доля, % |",
+        "|---|---|---|---|---|---|",
+    ]
+    for method in report["methods"]:
+        for peak, label in (("first_peak", "первый"),
+                            ("second_peak", "второй")):
+            item = method["refusals"][peak]
+            share = ("не применимо" if item["refusal_pct"] is None
+                     else _num(item["refusal_pct"], 3))
+            lines.append(
+                f"| {method['label']} | {label} | {item['expected']} | "
+                f"{item['successes']} | "
+                f"{item['expected'] - item['successes']} | {share} |")
+    etalon = report["etalon_refusals"]
+    lines += [
+        "",
+        f"Отказы на чистом эталоне: первый пик — "
+        f"{etalon['first_peak']['expected'] - etalon['first_peak']['successes']} "
+        f"из {etalon['first_peak']['expected']}, второй — "
+        f"{etalon['second_peak']['expected'] - etalon['second_peak']['successes']} "
+        f"из {etalon['second_peak']['expected']}.",
+        "",
+        "## Парные сравнения второго пика (§7.5)",
+        "",
+        "Разность — средняя по парам величина «база минус обработка»; "
+        "положительная разность означает, что обработка ближе к эталону.",
+        "",
+        "| Сравнение | Показатель | Пар | Разность, п.п. | Разность, "
+        "единицы | t | p | p Холма | Решение |",
+        "|---|---|---|---|---|---|---|---|---|",
+    ]
+    for item in statistics_section["comparisons"]:
+        absolute = ("—" if item["mean_absolute_difference"] is None
+                    else f"{_num(item['mean_absolute_difference'], 4)} "
+                         f"{item['unit']}")
+        lines.append(
+            f"| {item['candidate_label']} против базы "
+            f"«{item['baseline_label']}» | "
+            f"{item['metric_label']} | {item['pairs_used']} | "
+            f"{_num(item['mean_difference_pct'], 3)} | {absolute} | "
+            f"{_num(item['statistic'], 3)} | {_p_value(item['p_value'])} | "
+            f"{_p_value(item['p_holm'])} | {item['decision']} |")
+    excluded = [(item["id"], item["excluded"]) for item in
+                statistics_section["comparisons"] if item["excluded"]]
+    missing = [item for item in statistics_section["comparisons"]
+               if item["status"] != "выполнено"]
+    lines.append("")
+    if missing:
+        notes = "; ".join(item.get("note", "") for item in missing)
+        lines.append(f"Невыполненные сравнения: {notes}. В поправку Холма "
+                     f"подставлена 1, порог не ослаблялся (§7.5, §7.7).")
+    else:
+        lines.append("Все четыре сравнения выполнены: пары — только эталоны "
+                     "с полными измерениями второго пика у обоих методов.")
+    for comparison_id, identifiers in excluded:
+        lines.append(f"Исключены из `{comparison_id}`: "
+                     f"{', '.join(f'`{item}`' for item in identifiers)}.")
+    if conclusion.get("incomplete_references"):
+        identifiers = ", ".join(
+            f"`{item}`" for item in conclusion["incomplete_references"])
+        lines.append(
+            f"Отказы второго пика у Баттерворта: {identifiers}; они "
+            f"исключены из парных сравнений и не дают полного "
+            f"подтверждения §7.6.")
+    lines += [
+        "",
+        "## Проверка условий §7.6",
+        "",
+        "| Условие | Значение | Выполнено |",
+        "|---|---|---|",
+    ]
+    for item in conclusion["conditions"]:
+        lines.append(f"| {item['name']} | {item['value']} | "
+                     f"{'да' if item['passed'] else 'нет'} |")
+    lines += [
+        "",
+        "## Итог",
+        "",
+        f"**{conclusion['level']}.** {conclusion['text']}",
+        "",
+        conclusion["note"],
+        "",
+        "## Файлы и следующий шаг",
+        "",
+        "- `errors.csv`, `refusals.csv` — ошибки и отказы по обработкам;",
+        "- `by_reference.csv` — значения по эталонам с признаком полноты "
+        "измерений;",
+        "- `comparisons.csv` — четыре парных сравнения с p-значениями и "
+        "поправкой Холма;",
+        "- `run.json` — настройки, статистика и вывод;",
+        "- графики: `plot_comparison.py --results results/main` → "
+        "`figures/index.md` (§4).",
+        "",
+        f"Верификатор: код {report['verifier']['exit_code']} "
+        f"({report['verifier']['result']}).",
+        f"Длительность этапа: {report['elapsed_sec']} с.",
+        "",
+    ]
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1561,7 +2372,11 @@ def main(argv: list[str] | None = None) -> int:
     select.add_argument("--data-dir", type=Path, default=ROOT / "data")
     select.add_argument("--results-dir", type=Path, default=ROOT / "results")
 
-    subparsers.add_parser("main", help="этап main (пока не реализован)")
+    main_stage = subparsers.add_parser(
+        "main", help="итоговое сравнение на данных проверки (§6)")
+    main_stage.add_argument("--data-dir", type=Path, default=ROOT / "data")
+    main_stage.add_argument("--results-dir", type=Path,
+                            default=ROOT / "results")
 
     args = parser.parse_args(argv)
     if args.stage == "prepare":
@@ -1570,7 +2385,7 @@ def main(argv: list[str] | None = None) -> int:
         return run_test(args.data_dir.resolve(), args.results_dir.resolve())
     if args.stage == "select":
         return run_select(args.data_dir.resolve(), args.results_dir.resolve())
-    return _not_implemented(args.stage)
+    return run_main(args.data_dir.resolve(), args.results_dir.resolve())
 
 
 if __name__ == "__main__":

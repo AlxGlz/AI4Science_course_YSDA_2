@@ -45,6 +45,7 @@ from .selection import (
     is_admissible,
     peak_score,
 )
+from .stats import family_p_values, holm_adjust, paired_test
 
 __all__ = [
     "FS_DEFAULT",
@@ -69,6 +70,8 @@ __all__ = [
     "choose_butterworth",
     "choose_moving_average",
     "count_admissible",
+    "holm_adjust",
+    "paired_test",
     "ManifestRow",
     "WaveTable",
     "ReferenceData",

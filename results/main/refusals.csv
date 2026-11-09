@@ -1,0 +1,7 @@
+method,method_label,kind,peak,expected,successes,refusals,refusal_pct
+raw,сырой сигнал,raw,первый,7885,7885,0,0.000000
+raw,сырой сигнал,raw,второй,5250,5250,0,0.000000
+moving_average_11,"скользящее среднее, окно 11",moving_average,первый,7885,7885,0,0.000000
+moving_average_11,"скользящее среднее, окно 11",moving_average,второй,5250,5250,0,0.000000
+butterworth_0.50_20.0_N4,"Баттерворт N=4, 0,50–20 Гц",butterworth,первый,7885,7885,0,0.000000
+butterworth_0.50_20.0_N4,"Баттерворт N=4, 0,50–20 Гц",butterworth,второй,5250,5249,1,0.019048
