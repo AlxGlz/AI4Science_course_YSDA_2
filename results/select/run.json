@@ -1,0 +1,1887 @@
+{
+  "stage": "select",
+  "status": "ok",
+  "generated_at": "2026-11-09T18:19:34+02:00",
+  "git_commit": "8da3032c6c5000dfa155ad2fdfc64580eb360534",
+  "dataset_version": "vasotest-v2",
+  "data_dir": "data",
+  "fs_hz": 320.0,
+  "evaluation_window_sec": [
+    5.0,
+    55.0
+  ],
+  "split": "tune",
+  "counts": {
+    "references": 24,
+    "inputs": 120,
+    "methods": 35,
+    "butterworth": 30,
+    "moving_average": 4,
+    "raw": 1
+  },
+  "waves": {
+    "total": 1899,
+    "evaluated": 1579,
+    "evaluated_with_second_peak": 1058
+  },
+  "etalon_refusals": {
+    "first_peak": {
+      "expected": 7895,
+      "successes": 7895,
+      "refusal_pct": 0.0
+    },
+    "second_peak": {
+      "expected": 5290,
+      "successes": 5290,
+      "refusal_pct": 0.0
+    }
+  },
+  "methods": [
+    {
+      "name": "raw",
+      "label": "сырой сигнал",
+      "settings": {
+        "kind": "raw"
+      },
+      "mean_absolute": {
+        "A1": 0.03402971674496382,
+        "t1": 7.856763388274982,
+        "A2": 0.06703972692576465,
+        "t2": 30.134757104105834
+      },
+      "mean_normalized_pct": {
+        "A1": 3.6393820762130225,
+        "t1": 0.9963137460860354,
+        "A2": 7.221915421463186,
+        "t2": 3.8019367450668047
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5290,
+        "t2": 5290
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5290,
+          "refusal_pct": 0.0
+        }
+      },
+      "score_pct": 7.221915421463186,
+      "admissible": true,
+      "elapsed_sec": 0.86
+    },
+    {
+      "name": "moving_average_11",
+      "label": "скользящее среднее, окно 11",
+      "settings": {
+        "kind": "moving_average",
+        "window": 11
+      },
+      "mean_absolute": {
+        "A1": 0.026661742650078077,
+        "t1": 4.255965216362829,
+        "A2": 0.05737233102582461,
+        "t2": 18.036337710499986
+      },
+      "mean_normalized_pct": {
+        "A1": 2.8108089844593453,
+        "t1": 0.5335500602740952,
+        "A2": 6.1627252178162495,
+        "t2": 2.245822522878454
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5290,
+        "t2": 5290
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5290,
+          "refusal_pct": 0.0
+        }
+      },
+      "score_pct": 6.1627252178162495,
+      "admissible": true,
+      "elapsed_sec": 0.72
+    },
+    {
+      "name": "butterworth_0.50_20.0_N4",
+      "label": "Баттерворт N=4, 0,50–20 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.5,
+        "f_high_hz": 20.0,
+        "N": 4
+      },
+      "mean_absolute": {
+        "A1": 0.0054143138845907665,
+        "t1": 3.2260650832083075,
+        "A2": 0.005969031106334608,
+        "t2": 14.078781946110926
+      },
+      "mean_normalized_pct": {
+        "A1": 0.566816990582348,
+        "t1": 0.38947401775603024,
+        "A2": 0.6456625713955052,
+        "t2": 1.7823079974837777
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5290,
+        "t2": 5290
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5290,
+          "refusal_pct": 0.0
+        }
+      },
+      "score_pct": 1.7823079974837777,
+      "admissible": true,
+      "elapsed_sec": 0.9
+    }
+  ],
+  "candidates": [
+    {
+      "name": "raw",
+      "label": "сырой сигнал",
+      "settings": {
+        "kind": "raw"
+      },
+      "mean_absolute": {
+        "A1": 0.03402971674496382,
+        "t1": 7.856763388274982,
+        "A2": 0.06703972692576465,
+        "t2": 30.134757104105834
+      },
+      "mean_normalized_pct": {
+        "A1": 3.6393820762130225,
+        "t1": 0.9963137460860354,
+        "A2": 7.221915421463186,
+        "t2": 3.8019367450668047
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5290,
+        "t2": 5290
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5290,
+          "refusal_pct": 0.0
+        }
+      },
+      "score_pct": 7.221915421463186,
+      "admissible": true,
+      "elapsed_sec": 0.86
+    },
+    {
+      "name": "moving_average_5",
+      "label": "скользящее среднее, окно 5",
+      "settings": {
+        "kind": "moving_average",
+        "window": 5
+      },
+      "mean_absolute": {
+        "A1": 0.024861816364957028,
+        "t1": 5.901063221206986,
+        "A2": 0.05797473476916519,
+        "t2": 20.501326542361245
+      },
+      "mean_normalized_pct": {
+        "A1": 2.660981336585601,
+        "t1": 0.745051488268856,
+        "A2": 6.232034613202104,
+        "t2": 2.562406577721763
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5290,
+        "t2": 5290
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5290,
+          "refusal_pct": 0.0
+        }
+      },
+      "score_pct": 6.232034613202104,
+      "admissible": true,
+      "elapsed_sec": 0.76
+    },
+    {
+      "name": "moving_average_11",
+      "label": "скользящее среднее, окно 11",
+      "settings": {
+        "kind": "moving_average",
+        "window": 11
+      },
+      "mean_absolute": {
+        "A1": 0.026661742650078077,
+        "t1": 4.255965216362829,
+        "A2": 0.05737233102582461,
+        "t2": 18.036337710499986
+      },
+      "mean_normalized_pct": {
+        "A1": 2.8108089844593453,
+        "t1": 0.5335500602740952,
+        "A2": 6.1627252178162495,
+        "t2": 2.245822522878454
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5290,
+        "t2": 5290
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5290,
+          "refusal_pct": 0.0
+        }
+      },
+      "score_pct": 6.1627252178162495,
+      "admissible": true,
+      "elapsed_sec": 0.72
+    },
+    {
+      "name": "moving_average_21",
+      "label": "скользящее среднее, окно 21",
+      "settings": {
+        "kind": "moving_average",
+        "window": 21
+      },
+      "mean_absolute": {
+        "A1": 0.049674245098621415,
+        "t1": 3.9748081593266793,
+        "A2": 0.06472646428549836,
+        "t2": 17.598041731021482
+      },
+      "mean_normalized_pct": {
+        "A1": 4.935771982151153,
+        "t1": 0.514039179863789,
+        "A2": 6.83640172539151,
+        "t2": 2.198792865136947
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5268,
+        "t2": 5268
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5268,
+          "refusal_pct": 0.4158790170132325
+        }
+      },
+      "score_pct": 6.83640172539151,
+      "admissible": false,
+      "elapsed_sec": 0.72
+    },
+    {
+      "name": "moving_average_41",
+      "label": "скользящее среднее, окно 41",
+      "settings": {
+        "kind": "moving_average",
+        "window": 41
+      },
+      "mean_absolute": {
+        "A1": 0.1550194890059177,
+        "t1": 9.58443581387623,
+        "A2": 0.11151560392804354,
+        "t2": 22.679012916682474
+      },
+      "mean_normalized_pct": {
+        "A1": 14.808361501197723,
+        "t1": 1.3285010623944353,
+        "A2": 11.153935220306881,
+        "t2": 2.983609682937721
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 4210,
+        "t2": 4210
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 4210,
+          "refusal_pct": 20.415879017013232
+        }
+      },
+      "score_pct": 11.153935220306881,
+      "admissible": false,
+      "elapsed_sec": 0.71
+    },
+    {
+      "name": "butterworth_0.10_3.0_N2",
+      "label": "Баттерворт N=2, 0,10–3 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.1,
+        "f_high_hz": 3.0,
+        "N": 2
+      },
+      "mean_absolute": {
+        "A1": 0.25551276414553853,
+        "t1": 25.355948649959732,
+        "A2": 0.0937140766029275,
+        "t2": 16.24588997931731
+      },
+      "mean_normalized_pct": {
+        "A1": 24.57018844063308,
+        "t1": 3.561203006172809,
+        "A2": 8.354703227521798,
+        "t2": 1.7402399579294572
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 1100,
+        "t2": 1100
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 1100,
+          "refusal_pct": 79.20604914933837
+        }
+      },
+      "score_pct": 8.354703227521798,
+      "admissible": false,
+      "elapsed_sec": 0.81
+    },
+    {
+      "name": "butterworth_0.10_3.0_N4",
+      "label": "Баттерворт N=4, 0,10–3 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.1,
+        "f_high_hz": 3.0,
+        "N": 4
+      },
+      "mean_absolute": {
+        "A1": 0.22219180005056882,
+        "t1": 29.82123030101489,
+        "A2": 0.12591039917786953,
+        "t2": 22.525880694054344
+      },
+      "mean_normalized_pct": {
+        "A1": 21.823894399245546,
+        "t1": 4.320615972816511,
+        "A2": 11.71262242175043,
+        "t2": 2.4951593260442406
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 2135,
+        "t2": 2135
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 2135,
+          "refusal_pct": 59.640831758034025
+        }
+      },
+      "score_pct": 11.71262242175043,
+      "admissible": false,
+      "elapsed_sec": 0.86
+    },
+    {
+      "name": "butterworth_0.10_5.0_N2",
+      "label": "Баттерворт N=2, 0,10–5 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.1,
+        "f_high_hz": 5.0,
+        "N": 2
+      },
+      "mean_absolute": {
+        "A1": 0.07606351377525021,
+        "t1": 7.7346606964303986,
+        "A2": 0.07499062368295438,
+        "t2": 11.415188821229775
+      },
+      "mean_normalized_pct": {
+        "A1": 7.600238457496718,
+        "t1": 1.1158064496035611,
+        "A2": 7.738761952264607,
+        "t2": 1.4145783270620915
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 4274,
+        "t2": 4274
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 4274,
+          "refusal_pct": 19.206049149338373
+        }
+      },
+      "score_pct": 7.738761952264607,
+      "admissible": false,
+      "elapsed_sec": 0.86
+    },
+    {
+      "name": "butterworth_0.10_5.0_N4",
+      "label": "Баттерворт N=4, 0,10–5 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.1,
+        "f_high_hz": 5.0,
+        "N": 4
+      },
+      "mean_absolute": {
+        "A1": 0.045937427583718965,
+        "t1": 6.381362015310221,
+        "A2": 0.06793036297862431,
+        "t2": 13.908094569157866
+      },
+      "mean_normalized_pct": {
+        "A1": 4.769118224825074,
+        "t1": 0.9493847171927386,
+        "A2": 7.1455869450101686,
+        "t2": 1.8418230154589674
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 4949,
+        "t2": 4949
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 4949,
+          "refusal_pct": 6.446124763705104
+        }
+      },
+      "score_pct": 7.1455869450101686,
+      "admissible": false,
+      "elapsed_sec": 0.9
+    },
+    {
+      "name": "butterworth_0.10_8.0_N2",
+      "label": "Баттерворт N=2, 0,10–8 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.1,
+        "f_high_hz": 8.0,
+        "N": 2
+      },
+      "mean_absolute": {
+        "A1": 0.028286565940102894,
+        "t1": 2.5793006083083236,
+        "A2": 0.0535920407870231,
+        "t2": 12.256601487813475
+      },
+      "mean_normalized_pct": {
+        "A1": 2.9829608276739314,
+        "t1": 0.3436045085832716,
+        "A2": 5.722352502896714,
+        "t2": 1.4708214179740517
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 4917,
+        "t2": 4917
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 4917,
+          "refusal_pct": 7.051039697542533
+        }
+      },
+      "score_pct": 5.722352502896714,
+      "admissible": false,
+      "elapsed_sec": 0.84
+    },
+    {
+      "name": "butterworth_0.10_8.0_N4",
+      "label": "Баттерворт N=4, 0,10–8 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.1,
+        "f_high_hz": 8.0,
+        "N": 4
+      },
+      "mean_absolute": {
+        "A1": 0.02320114611803129,
+        "t1": 1.9845417349532648,
+        "A2": 0.05325435737900598,
+        "t2": 12.12869509867966
+      },
+      "mean_normalized_pct": {
+        "A1": 2.484598431996671,
+        "t1": 0.24439734219187184,
+        "A2": 5.726337033504092,
+        "t2": 1.456414571676284
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 4885,
+        "t2": 4885
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 4885,
+          "refusal_pct": 7.655954631379962
+        }
+      },
+      "score_pct": 5.726337033504092,
+      "admissible": false,
+      "elapsed_sec": 0.88
+    },
+    {
+      "name": "butterworth_0.10_12.0_N2",
+      "label": "Баттерворт N=2, 0,10–12 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.1,
+        "f_high_hz": 12.0,
+        "N": 2
+      },
+      "mean_absolute": {
+        "A1": 0.022216417417079765,
+        "t1": 2.349099151521079,
+        "A2": 0.05084975624305752,
+        "t2": 14.754264373729093
+      },
+      "mean_normalized_pct": {
+        "A1": 2.374064055390522,
+        "t1": 0.28293091799602027,
+        "A2": 5.461974024452188,
+        "t2": 1.791331109308691
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5095,
+        "t2": 5095
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5095,
+          "refusal_pct": 3.6862003780718338
+        }
+      },
+      "score_pct": 5.461974024452188,
+      "admissible": false,
+      "elapsed_sec": 0.83
+    },
+    {
+      "name": "butterworth_0.10_12.0_N4",
+      "label": "Баттерворт N=4, 0,10–12 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.1,
+        "f_high_hz": 12.0,
+        "N": 4
+      },
+      "mean_absolute": {
+        "A1": 0.02268086487897034,
+        "t1": 2.432832793921668,
+        "A2": 0.0527282633881572,
+        "t2": 14.840617718676983
+      },
+      "mean_normalized_pct": {
+        "A1": 2.4240745137982884,
+        "t1": 0.2988454803011076,
+        "A2": 5.666392031370295,
+        "t2": 1.8001823172193252
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5032,
+        "t2": 5032
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5032,
+          "refusal_pct": 4.877126654064273
+        }
+      },
+      "score_pct": 5.666392031370295,
+      "admissible": false,
+      "elapsed_sec": 0.89
+    },
+    {
+      "name": "butterworth_0.10_20.0_N2",
+      "label": "Баттерворт N=2, 0,10–20 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.1,
+        "f_high_hz": 20.0,
+        "N": 2
+      },
+      "mean_absolute": {
+        "A1": 0.02212134683994924,
+        "t1": 3.6971060087666925,
+        "A2": 0.051451693654389126,
+        "t2": 17.54793136535066
+      },
+      "mean_normalized_pct": {
+        "A1": 2.3623348798158195,
+        "t1": 0.4491637408325994,
+        "A2": 5.5309665363486635,
+        "t2": 2.176788319788038
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5264,
+        "t2": 5264
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5264,
+          "refusal_pct": 0.4914933837429111
+        }
+      },
+      "score_pct": 5.5309665363486635,
+      "admissible": false,
+      "elapsed_sec": 0.84
+    },
+    {
+      "name": "butterworth_0.10_20.0_N4",
+      "label": "Баттерворт N=4, 0,10–20 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.1,
+        "f_high_hz": 20.0,
+        "N": 4
+      },
+      "mean_absolute": {
+        "A1": 0.023016900535271393,
+        "t1": 3.723686488584567,
+        "A2": 0.05340807117007549,
+        "t2": 17.807241374442793
+      },
+      "mean_normalized_pct": {
+        "A1": 2.461328939856172,
+        "t1": 0.452049851595572,
+        "A2": 5.753433032099874,
+        "t2": 2.2148184528020503
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5231,
+        "t2": 5231
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5231,
+          "refusal_pct": 1.11531190926276
+        }
+      },
+      "score_pct": 5.753433032099874,
+      "admissible": false,
+      "elapsed_sec": 0.89
+    },
+    {
+      "name": "butterworth_0.30_3.0_N2",
+      "label": "Баттерворт N=2, 0,30–3 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.3,
+        "f_high_hz": 3.0,
+        "N": 2
+      },
+      "mean_absolute": {
+        "A1": 0.2378286465318931,
+        "t1": 26.203441480553497,
+        "A2": 0.11236815852407503,
+        "t2": 14.80144602289305
+      },
+      "mean_normalized_pct": {
+        "A1": 22.988477969461115,
+        "t1": 3.710775639215466,
+        "A2": 9.363235576137663,
+        "t2": 1.571167586177937
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 1318,
+        "t2": 1318
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 1318,
+          "refusal_pct": 75.08506616257088
+        }
+      },
+      "score_pct": 9.363235576137663,
+      "admissible": false,
+      "elapsed_sec": 0.81
+    },
+    {
+      "name": "butterworth_0.30_3.0_N4",
+      "label": "Баттерворт N=4, 0,30–3 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.3,
+        "f_high_hz": 3.0,
+        "N": 4
+      },
+      "mean_absolute": {
+        "A1": 0.21546736770507202,
+        "t1": 30.261892748912715,
+        "A2": 0.11287909813597406,
+        "t2": 24.35171850068119
+      },
+      "mean_normalized_pct": {
+        "A1": 21.256990152368942,
+        "t1": 4.407840712806919,
+        "A2": 10.14027622589501,
+        "t2": 2.693693873350131
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 2423,
+        "t2": 2423
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 2423,
+          "refusal_pct": 54.19659735349716
+        }
+      },
+      "score_pct": 10.14027622589501,
+      "admissible": false,
+      "elapsed_sec": 0.86
+    },
+    {
+      "name": "butterworth_0.30_5.0_N2",
+      "label": "Баттерворт N=2, 0,30–5 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.3,
+        "f_high_hz": 5.0,
+        "N": 2
+      },
+      "mean_absolute": {
+        "A1": 0.05982604756742049,
+        "t1": 7.012937434908072,
+        "A2": 0.061876183455101,
+        "t2": 6.4544934757781975
+      },
+      "mean_normalized_pct": {
+        "A1": 5.991022962232884,
+        "t1": 1.032604884570101,
+        "A2": 6.230350636379539,
+        "t2": 0.7807276812961856
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5184,
+        "t2": 5184
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5184,
+          "refusal_pct": 2.003780718336484
+        }
+      },
+      "score_pct": 6.230350636379539,
+      "admissible": false,
+      "elapsed_sec": 0.83
+    },
+    {
+      "name": "butterworth_0.30_5.0_N4",
+      "label": "Баттерворт N=4, 0,30–5 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.3,
+        "f_high_hz": 5.0,
+        "N": 4
+      },
+      "mean_absolute": {
+        "A1": 0.033826671166537405,
+        "t1": 5.9005903319830715,
+        "A2": 0.04542377843562793,
+        "t2": 10.939080559759324
+      },
+      "mean_normalized_pct": {
+        "A1": 3.4912778162085463,
+        "t1": 0.898521007982576,
+        "A2": 4.675097422935319,
+        "t2": 1.5427586303378467
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5171,
+        "t2": 5171
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5171,
+          "refusal_pct": 2.2495274102079397
+        }
+      },
+      "score_pct": 4.675097422935319,
+      "admissible": false,
+      "elapsed_sec": 0.88
+    },
+    {
+      "name": "butterworth_0.30_8.0_N2",
+      "label": "Баттерворт N=2, 0,30–8 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.3,
+        "f_high_hz": 8.0,
+        "N": 2
+      },
+      "mean_absolute": {
+        "A1": 0.015129876988649106,
+        "t1": 1.801302775867789,
+        "A2": 0.026020962314552212,
+        "t2": 8.492274162964994
+      },
+      "mean_normalized_pct": {
+        "A1": 1.5679828878366966,
+        "t1": 0.24869081728521236,
+        "A2": 2.7544099953977192,
+        "t2": 1.0038136002892053
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5185,
+        "t2": 5185
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5185,
+          "refusal_pct": 1.9848771266540643
+        }
+      },
+      "score_pct": 2.7544099953977192,
+      "admissible": false,
+      "elapsed_sec": 0.83
+    },
+    {
+      "name": "butterworth_0.30_8.0_N4",
+      "label": "Баттерворт N=4, 0,30–8 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.3,
+        "f_high_hz": 8.0,
+        "N": 4
+      },
+      "mean_absolute": {
+        "A1": 0.009474874961890435,
+        "t1": 1.1388040910264756,
+        "A2": 0.02090076859880421,
+        "t2": 8.271235368332794
+      },
+      "mean_normalized_pct": {
+        "A1": 1.0148050057188847,
+        "t1": 0.13860170357323612,
+        "A2": 2.235230564078065,
+        "t2": 0.9797660999379821
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5146,
+        "t2": 5146
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5146,
+          "refusal_pct": 2.722117202268431
+        }
+      },
+      "score_pct": 2.235230564078065,
+      "admissible": false,
+      "elapsed_sec": 0.88
+    },
+    {
+      "name": "butterworth_0.30_12.0_N2",
+      "label": "Баттерворт N=2, 0,30–12 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.3,
+        "f_high_hz": 12.0,
+        "N": 2
+      },
+      "mean_absolute": {
+        "A1": 0.009588812590024238,
+        "t1": 1.7086618346016091,
+        "A2": 0.020046125507357605,
+        "t2": 11.888263346597617
+      },
+      "mean_normalized_pct": {
+        "A1": 1.0180232426134335,
+        "t1": 0.2016411115369603,
+        "A2": 2.1547458652313654,
+        "t2": 1.444240066625898
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5257,
+        "t2": 5257
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5257,
+          "refusal_pct": 0.6238185255198487
+        }
+      },
+      "score_pct": 2.1547458652313654,
+      "admissible": false,
+      "elapsed_sec": 0.83
+    },
+    {
+      "name": "butterworth_0.30_12.0_N4",
+      "label": "Баттерворт N=4, 0,30–12 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.3,
+        "f_high_hz": 12.0,
+        "N": 4
+      },
+      "mean_absolute": {
+        "A1": 0.008611777714732653,
+        "t1": 1.7640238728619713,
+        "A2": 0.01862271879166502,
+        "t2": 11.759452101270835
+      },
+      "mean_normalized_pct": {
+        "A1": 0.9124732684296272,
+        "t1": 0.2139262800084459,
+        "A2": 1.9765666668913595,
+        "t2": 1.4236797133485481
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5226,
+        "t2": 5226
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5226,
+          "refusal_pct": 1.2098298676748582
+        }
+      },
+      "score_pct": 1.9765666668913595,
+      "admissible": false,
+      "elapsed_sec": 0.88
+    },
+    {
+      "name": "butterworth_0.30_20.0_N2",
+      "label": "Баттерворт N=2, 0,30–20 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.3,
+        "f_high_hz": 20.0,
+        "N": 2
+      },
+      "mean_absolute": {
+        "A1": 0.009774949806693705,
+        "t1": 3.3228898475888884,
+        "A2": 0.02023547621727758,
+        "t2": 14.934350167997192
+      },
+      "mean_normalized_pct": {
+        "A1": 1.0314127547495928,
+        "t1": 0.40207578537093364,
+        "A2": 2.1686725041866493,
+        "t2": 1.8670292991491295
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5290,
+        "t2": 5290
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5290,
+          "refusal_pct": 0.0
+        }
+      },
+      "score_pct": 2.1686725041866493,
+      "admissible": true,
+      "elapsed_sec": 0.83
+    },
+    {
+      "name": "butterworth_0.30_20.0_N4",
+      "label": "Баттерворт N=4, 0,30–20 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.3,
+        "f_high_hz": 20.0,
+        "N": 4
+      },
+      "mean_absolute": {
+        "A1": 0.00924388934856352,
+        "t1": 3.3302146683730207,
+        "A2": 0.019464873534445967,
+        "t2": 15.228758147031595
+      },
+      "mean_normalized_pct": {
+        "A1": 0.9799790125476072,
+        "t1": 0.40112349609588355,
+        "A2": 2.067147174945404,
+        "t2": 1.9014105019516057
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5289,
+        "t2": 5289
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5289,
+          "refusal_pct": 0.01890359168241966
+        }
+      },
+      "score_pct": 2.067147174945404,
+      "admissible": false,
+      "elapsed_sec": 0.88
+    },
+    {
+      "name": "butterworth_0.50_3.0_N2",
+      "label": "Баттерворт N=2, 0,50–3 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.5,
+        "f_high_hz": 3.0,
+        "N": 2
+      },
+      "mean_absolute": {
+        "A1": 0.2275232400144208,
+        "t1": 26.731835554128523,
+        "A2": 0.11317506613637486,
+        "t2": 17.72557131242218
+      },
+      "mean_normalized_pct": {
+        "A1": 22.06817654311543,
+        "t1": 3.8198551037582447,
+        "A2": 10.264838349001334,
+        "t2": 1.8803445156002871
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 1794,
+        "t2": 1794
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 1794,
+          "refusal_pct": 66.08695652173913
+        }
+      },
+      "score_pct": 10.264838349001334,
+      "admissible": false,
+      "elapsed_sec": 0.81
+    },
+    {
+      "name": "butterworth_0.50_3.0_N4",
+      "label": "Баттерворт N=4, 0,50–3 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.5,
+        "f_high_hz": 3.0,
+        "N": 4
+      },
+      "mean_absolute": {
+        "A1": 0.2112514981398722,
+        "t1": 30.909745253278697,
+        "A2": 0.10066306132052408,
+        "t2": 28.876605776372262
+      },
+      "mean_normalized_pct": {
+        "A1": 20.947692232259783,
+        "t1": 4.525578939070718,
+        "A2": 8.822025338268807,
+        "t2": 3.0917742767539784
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 2447,
+        "t2": 2447
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 2447,
+          "refusal_pct": 53.742911153119096
+        }
+      },
+      "score_pct": 8.822025338268807,
+      "admissible": false,
+      "elapsed_sec": 0.86
+    },
+    {
+      "name": "butterworth_0.50_5.0_N2",
+      "label": "Баттерворт N=2, 0,50–5 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.5,
+        "f_high_hz": 5.0,
+        "N": 2
+      },
+      "mean_absolute": {
+        "A1": 0.052546267586580354,
+        "t1": 6.314079593759465,
+        "A2": 0.051279532247923504,
+        "t2": 5.943196851923542
+      },
+      "mean_normalized_pct": {
+        "A1": 5.213121566727925,
+        "t1": 0.9496774066751806,
+        "A2": 5.036467849292334,
+        "t2": 0.7297853653134552
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5289,
+        "t2": 5289
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5289,
+          "refusal_pct": 0.01890359168241966
+        }
+      },
+      "score_pct": 5.036467849292334,
+      "admissible": false,
+      "elapsed_sec": 0.82
+    },
+    {
+      "name": "butterworth_0.50_5.0_N4",
+      "label": "Баттерворт N=4, 0,50–5 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.5,
+        "f_high_hz": 5.0,
+        "N": 4
+      },
+      "mean_absolute": {
+        "A1": 0.029523839554404074,
+        "t1": 5.791627652596639,
+        "A2": 0.03488864182972241,
+        "t2": 9.930638227825126
+      },
+      "mean_normalized_pct": {
+        "A1": 3.026794703840251,
+        "t1": 0.8861184633807183,
+        "A2": 3.5044375418244775,
+        "t2": 1.4717674508800422
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5240,
+        "t2": 5240
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5240,
+          "refusal_pct": 0.945179584120983
+        }
+      },
+      "score_pct": 3.5044375418244775,
+      "admissible": false,
+      "elapsed_sec": 0.87
+    },
+    {
+      "name": "butterworth_0.50_8.0_N2",
+      "label": "Баттерворт N=2, 0,50–8 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.5,
+        "f_high_hz": 8.0,
+        "N": 2
+      },
+      "mean_absolute": {
+        "A1": 0.013440600606043152,
+        "t1": 1.539464347193311,
+        "A2": 0.01507068960698895,
+        "t2": 8.046789346596686
+      },
+      "mean_normalized_pct": {
+        "A1": 1.262592044907355,
+        "t1": 0.21178460806355906,
+        "A2": 1.4916218157451697,
+        "t2": 0.9304283380312783
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5259,
+        "t2": 5259
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5259,
+          "refusal_pct": 0.5860113421550095
+        }
+      },
+      "score_pct": 1.4916218157451697,
+      "admissible": false,
+      "elapsed_sec": 0.82
+    },
+    {
+      "name": "butterworth_0.50_8.0_N4",
+      "label": "Баттерворт N=4, 0,50–8 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.5,
+        "f_high_hz": 8.0,
+        "N": 4
+      },
+      "mean_absolute": {
+        "A1": 0.005689102114587885,
+        "t1": 1.0119441396282463,
+        "A2": 0.007473230201272011,
+        "t2": 6.8402464347957235
+      },
+      "mean_normalized_pct": {
+        "A1": 0.5905224704203977,
+        "t1": 0.12538289595922444,
+        "A2": 0.7935451606854975,
+        "t2": 0.8251288879943212
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5227,
+        "t2": 5227
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5227,
+          "refusal_pct": 1.1909262759924386
+        }
+      },
+      "score_pct": 0.8251288879943212,
+      "admissible": false,
+      "elapsed_sec": 0.87
+    },
+    {
+      "name": "butterworth_0.50_12.0_N2",
+      "label": "Баттерворт N=2, 0,50–12 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.5,
+        "f_high_hz": 12.0,
+        "N": 2
+      },
+      "mean_absolute": {
+        "A1": 0.010512655997106062,
+        "t1": 1.6141404711609517,
+        "A2": 0.008774832739328324,
+        "t2": 11.534638314539938
+      },
+      "mean_normalized_pct": {
+        "A1": 0.951881925326374,
+        "t1": 0.18785638209432867,
+        "A2": 0.8726206091589042,
+        "t2": 1.3839899816923136
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5282,
+        "t2": 5282
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5282,
+          "refusal_pct": 0.15122873345935728
+        }
+      },
+      "score_pct": 1.3839899816923136,
+      "admissible": false,
+      "elapsed_sec": 0.82
+    },
+    {
+      "name": "butterworth_0.50_12.0_N4",
+      "label": "Баттерворт N=4, 0,50–12 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.5,
+        "f_high_hz": 12.0,
+        "N": 4
+      },
+      "mean_absolute": {
+        "A1": 0.00466071467298703,
+        "t1": 1.6516962841624607,
+        "A2": 0.004819808154362535,
+        "t2": 10.602147006921053
+      },
+      "mean_normalized_pct": {
+        "A1": 0.48220036503651226,
+        "t1": 0.20128955730218753,
+        "A2": 0.5148215032031885,
+        "t2": 1.303844466711903
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5265,
+        "t2": 5265
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5265,
+          "refusal_pct": 0.4725897920604915
+        }
+      },
+      "score_pct": 1.303844466711903,
+      "admissible": false,
+      "elapsed_sec": 0.88
+    },
+    {
+      "name": "butterworth_0.50_20.0_N2",
+      "label": "Баттерворт N=2, 0,50–20 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.5,
+        "f_high_hz": 20.0,
+        "N": 2
+      },
+      "mean_absolute": {
+        "A1": 0.012470752161615565,
+        "t1": 3.2853346520049898,
+        "A2": 0.009012010220784595,
+        "t2": 14.596250307859696
+      },
+      "mean_normalized_pct": {
+        "A1": 1.1133230244998262,
+        "t1": 0.3956683041024391,
+        "A2": 0.8969754586036502,
+        "t2": 1.8078562714997464
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5290,
+        "t2": 5290
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5290,
+          "refusal_pct": 0.0
+        }
+      },
+      "score_pct": 1.8078562714997464,
+      "admissible": true,
+      "elapsed_sec": 0.83
+    },
+    {
+      "name": "butterworth_0.50_20.0_N4",
+      "label": "Баттерворт N=4, 0,50–20 Гц",
+      "settings": {
+        "kind": "butterworth",
+        "f_low_hz": 0.5,
+        "f_high_hz": 20.0,
+        "N": 4
+      },
+      "mean_absolute": {
+        "A1": 0.0054143138845907665,
+        "t1": 3.2260650832083075,
+        "A2": 0.005969031106334608,
+        "t2": 14.078781946110926
+      },
+      "mean_normalized_pct": {
+        "A1": 0.566816990582348,
+        "t1": 0.38947401775603024,
+        "A2": 0.6456625713955052,
+        "t2": 1.7823079974837777
+      },
+      "values_count": {
+        "A1": 7895,
+        "t1": 7895,
+        "A2": 5290,
+        "t2": 5290
+      },
+      "refusals": {
+        "first_peak": {
+          "expected": 7895,
+          "successes": 7895,
+          "refusal_pct": 0.0
+        },
+        "second_peak": {
+          "expected": 5290,
+          "successes": 5290,
+          "refusal_pct": 0.0
+        }
+      },
+      "score_pct": 1.7823079974837777,
+      "admissible": true,
+      "elapsed_sec": 0.9
+    }
+  ],
+  "selection": {
+    "rule": "§7",
+    "thresholds": {
+      "e_a1_max_pct": 5.0,
+      "e_t1_max_pct": 5.0,
+      "refusals": "не допускаются ни на одном пике"
+    },
+    "score": "минимум max(E_A2, E_t2) после усреднения §2",
+    "tie_break": {
+      "moving_average": "меньшее окно",
+      "butterworth": "меньший N, затем меньшая нижняя, затем меньшая верхняя частота"
+    },
+    "admissible_counts": {
+      "butterworth": 3,
+      "moving_average": 2
+    },
+    "chosen": {
+      "butterworth": {
+        "name": "butterworth_0.50_20.0_N4",
+        "label": "Баттерворт N=4, 0,50–20 Гц",
+        "settings": {
+          "kind": "butterworth",
+          "f_low_hz": 0.5,
+          "f_high_hz": 20.0,
+          "N": 4
+        },
+        "score_pct": 1.7823079974837777,
+        "mean_absolute": {
+          "A1": 0.0054143138845907665,
+          "t1": 3.2260650832083075,
+          "A2": 0.005969031106334608,
+          "t2": 14.078781946110926
+        },
+        "mean_normalized_pct": {
+          "A1": 0.566816990582348,
+          "t1": 0.38947401775603024,
+          "A2": 0.6456625713955052,
+          "t2": 1.7823079974837777
+        }
+      },
+      "moving_average": {
+        "name": "moving_average_11",
+        "label": "скользящее среднее, окно 11",
+        "settings": {
+          "kind": "moving_average",
+          "window": 11
+        },
+        "score_pct": 6.1627252178162495,
+        "mean_absolute": {
+          "A1": 0.026661742650078077,
+          "t1": 4.255965216362829,
+          "A2": 0.05737233102582461,
+          "t2": 18.036337710499986
+        },
+        "mean_normalized_pct": {
+          "A1": 2.8108089844593453,
+          "t1": 0.5335500602740952,
+          "A2": 6.1627252178162495,
+          "t2": 2.245822522878454
+        }
+      },
+      "raw": {
+        "name": "raw",
+        "label": "сырой сигнал",
+        "settings": {
+          "kind": "raw"
+        },
+        "score_pct": 7.221915421463186,
+        "mean_absolute": {
+          "A1": 0.03402971674496382,
+          "t1": 7.856763388274982,
+          "A2": 0.06703972692576465,
+          "t2": 30.134757104105834
+        },
+        "mean_normalized_pct": {
+          "A1": 3.6393820762130225,
+          "t1": 0.9963137460860354,
+          "A2": 7.221915421463186,
+          "t2": 3.8019367450668047
+        }
+      }
+    },
+    "termination": {
+      "butterworth_found": true,
+      "moving_average_found": true,
+      "action": "Настройки выбраны; основной прогон — после фиксации настроек коммитом (§7.4)"
+    }
+  },
+  "evaluated_inputs": [
+    "03-1",
+    "03-2",
+    "03-3",
+    "03-4",
+    "03-5",
+    "06-1",
+    "06-2",
+    "06-3",
+    "06-4",
+    "06-5",
+    "08-1",
+    "08-2",
+    "08-3",
+    "08-4",
+    "08-5",
+    "10-1",
+    "10-2",
+    "10-3",
+    "10-4",
+    "10-5",
+    "14-1",
+    "14-2",
+    "14-3",
+    "14-4",
+    "14-5",
+    "16-1",
+    "16-2",
+    "16-3",
+    "16-4",
+    "16-5",
+    "17-1",
+    "17-2",
+    "17-3",
+    "17-4",
+    "17-5",
+    "18-1",
+    "18-2",
+    "18-3",
+    "18-4",
+    "18-5",
+    "19-1",
+    "19-2",
+    "19-3",
+    "19-4",
+    "19-5",
+    "20-1",
+    "20-2",
+    "20-3",
+    "20-4",
+    "20-5",
+    "21-1",
+    "21-2",
+    "21-3",
+    "21-4",
+    "21-5",
+    "25-1",
+    "25-2",
+    "25-3",
+    "25-4",
+    "25-5",
+    "28-1",
+    "28-2",
+    "28-3",
+    "28-4",
+    "28-5",
+    "31-1",
+    "31-2",
+    "31-3",
+    "31-4",
+    "31-5",
+    "33-1",
+    "33-2",
+    "33-3",
+    "33-4",
+    "33-5",
+    "34-1",
+    "34-2",
+    "34-3",
+    "34-4",
+    "34-5",
+    "35-1",
+    "35-2",
+    "35-3",
+    "35-4",
+    "35-5",
+    "37-1",
+    "37-2",
+    "37-3",
+    "37-4",
+    "37-5",
+    "40-1",
+    "40-2",
+    "40-3",
+    "40-4",
+    "40-5",
+    "41-1",
+    "41-2",
+    "41-3",
+    "41-4",
+    "41-5",
+    "42-1",
+    "42-2",
+    "42-3",
+    "42-4",
+    "42-5",
+    "45-1",
+    "45-2",
+    "45-3",
+    "45-4",
+    "45-5",
+    "47-1",
+    "47-2",
+    "47-3",
+    "47-4",
+    "47-5",
+    "48-1",
+    "48-2",
+    "48-3",
+    "48-4",
+    "48-5"
+  ],
+  "verifier": {
+    "exit_code": 0,
+    "result": "80 passed in 3.49s"
+  },
+  "environment": {
+    "python": "3.13.14",
+    "packages": {
+      "numpy": "2.5.2",
+      "scipy": "1.18.1",
+      "matplotlib": "3.11.2",
+      "statsmodels": "0.14.5",
+      "pytest": "9.1.1",
+      "hypothesis": "6.142.4"
+    }
+  },
+  "elapsed_sec": 38.42
+}

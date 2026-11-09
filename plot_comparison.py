@@ -67,9 +67,9 @@ def _relative(path: Path) -> str:
 
 
 def _write_index(path: Path, stage: str,
-                 run_path: Path, methods, zoom: tuple[float, float],
-                 files: list[tuple[str, str, int, Path, Path, Path, Path]]
-                 ) -> None:
+                 run_path: Path, methods,
+                 files: list[tuple[str, str, int, Path, Path, Path, Path,
+                                  float, float]]) -> None:
     """Оглавление графиков этапа со ссылками на сохранённые файлы."""
     lines = [
         f"# Графики: {STAGE_LABELS[stage]}",
@@ -83,17 +83,17 @@ def _write_index(path: Path, stage: str,
         "- Шкала амплитуды общая для всех панелей, без нормировки и сдвига "
         "кривых; пунктир — начало волны, круги — первый пик, "
         "квадраты — второй пик.",
-        f"- Увеличенный фрагмент по умолчанию: {zoom[0]:.3f}–"
-        f"{zoom[0] + zoom[1]:.3f} с (несколько волн).",
         "",
-        "| Вход | Класс формы | Реализация | Обзор записи | Фрагмент |",
-        "|---|---|---|---|---|",
+        "| Вход | Класс формы | Реализация | Фрагмент, с | Обзор записи | "
+        "Фрагмент |",
+        "|---|---|---|---|---|---|",
     ]
     for input_id, wave_class, repeat, overview_png, overview_svg, \
-            zoom_png, zoom_svg in files:
+            zoom_png, zoom_svg, zoom_start, zoom_duration in files:
         lines.append(
             f"| `{input_id}` | {CLASS_LABELS.get(wave_class, wave_class)} | "
-            f"№{repeat} | [PNG]({overview_png.name}) · "
+            f"№{repeat} | {zoom_start:.3f}–{zoom_start + zoom_duration:.3f} | "
+            f"[PNG]({overview_png.name}) · "
             f"[SVG]({overview_svg.name}) | [PNG]({zoom_png.name}) · "
             f"[SVG]({zoom_svg.name}) |")
     lines.append("")
@@ -151,7 +151,8 @@ def main(argv: list[str] | None = None) -> int:
     diagnostic = (bool(report.get("diagnostics"))
                   or str(report.get("status")) in {"no_acceptable",
                                                    "diagnostic"})
-    index_rows: list[tuple[str, str, int, Path, Path, Path, Path]] = []
+    index_rows: list[tuple[str, str, int, Path, Path, Path, Path,
+                           float, float]] = []
     zoom: tuple[float, float] | None = None
 
     for row in rows:
@@ -203,13 +204,14 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
         index_rows.append((row.input_id, row.wave_class, row.noise_repeat,
-                           overview_png, overview_svg, zoom_png, zoom_svg))
+                           overview_png, overview_svg, zoom_png, zoom_svg,
+                           zoom[0], zoom[1]))
         print(f"Вход {row.input_id}: обзор и фрагмент {zoom[0]:.3f}–"
               f"{zoom[0] + zoom[1]:.3f} с — {overview_png.name}, {zoom_png.name}")
 
     assert zoom is not None
     _write_index(figure_dir / "index.md", stage, run_path,
-                 methods, zoom, index_rows)
+                 methods, index_rows)
 
     elapsed = time.perf_counter() - started
     print(f"Графиков: {2 * len(rows)} файла PNG и столько же SVG; "

@@ -38,6 +38,13 @@ from .metrics import (
     normalized_errors,
     refusal_stats,
 )
+from .selection import (
+    choose_butterworth,
+    choose_moving_average,
+    count_admissible,
+    is_admissible,
+    peak_score,
+)
 
 __all__ = [
     "FS_DEFAULT",
@@ -57,6 +64,11 @@ __all__ = [
     "refusal_summary",
     "etalon_refusal_summary",
     "select_evaluation_mask",
+    "is_admissible",
+    "peak_score",
+    "choose_butterworth",
+    "choose_moving_average",
+    "count_admissible",
     "ManifestRow",
     "WaveTable",
     "ReferenceData",

@@ -42,6 +42,8 @@ REQUIRED_CODE: dict[str, tuple[str, ...]] = {
     "ppg.experiment": ("select_evaluation_mask", "compare_waves",
                        "error_series", "value_counts", "refusal_summary",
                        "etalon_refusal_summary"),
+    "ppg.selection": ("is_admissible", "peak_score", "choose_butterworth",
+                      "choose_moving_average", "count_admissible"),
 }
 
 # Обязательные проверки §5: строки таблицы и согласованные контрольные сигналы.

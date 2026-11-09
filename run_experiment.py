@@ -1,21 +1,23 @@
 """Этапы эксперимента §6 методики.
 
-Реализованы этапы ``prepare`` (проверка данных и верификатора, план расчётов)
-и ``test`` (однократный прогон на одном входе с сохранением измерений,
-ошибок, отказов и настроек). Этапы ``select`` и ``main`` пока не реализованы.
+Реализованы этапы ``prepare`` (проверка данных и верификатора, план расчётов),
+и ``test`` (однократный прогон на одном входе) и ``select`` (подбор
+параметров на данных для подбора); ``main`` пока не реализован.
 
 Команды (из корня проекта):
 
     Windows: ``.\\venv\\Scripts\\python.exe run_experiment.py prepare``
              ``.\\venv\\Scripts\\python.exe run_experiment.py test``
+             ``.\\venv\\Scripts\\python.exe run_experiment.py select``
     macOS:   ``./.venv/bin/python run_experiment.py prepare``
              ``./.venv/bin/python run_experiment.py test``
+             ``./.venv/bin/python run_experiment.py select``
 
 Данные: ``data/manifest.csv``, ``data/references/``, ``data/noisy/``,
 ``data/annotations/``; чтение — через ``ppg.io``, вычисления — через
-``ppg.experiment``, ``ppg.filters``, ``ppg.measure``, ``ppg.metrics``.
+``ppg.experiment``, ``ppg.filters``, ``ppg.measure``, ``ppg.metrics``, ``ppg.methods``, ``ppg.selection``.
 Проверка: ``verify.py`` (запускается этим скриптом первым шагом).
-Используется в: этапы ``select`` и ``main`` после реализации.
+Используется в: этап ``main`` после фиксации настроек.
 """
 
 from __future__ import annotations
@@ -60,7 +62,14 @@ from ppg.experiment import (  # noqa: E402
 from ppg.filters import butter_bandpass, moving_average  # noqa: E402
 from ppg.measure import FS_DEFAULT  # noqa: E402
 from ppg.methods import apply_method, method_settings  # noqa: E402
-from ppg.metrics import ABS_KEYS, nested_mean  # noqa: E402
+from ppg.selection import (  # noqa: E402
+    choose_butterworth,
+    choose_moving_average,
+    count_admissible,
+    is_admissible,
+    peak_score,
+)
+from ppg.metrics import ABS_KEYS, nested_mean, refusal_stats  # noqa: E402
 
 FILTER_LOW_HZ = (0.10, 0.30, 0.50)
 FILTER_HIGH_HZ = (3.0, 5.0, 8.0, 12.0, 20.0)
@@ -876,9 +885,658 @@ def _write_test_summary(path: Path, report: dict) -> None:
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
+def _plural(count: int, one: str, few: str, many: str) -> str:
+    """Русская форма существительного после числа."""
+    if count % 10 == 1 and count % 100 != 11:
+        return one
+    if 2 <= count % 10 <= 4 and not 12 <= count % 100 <= 14:
+        return few
+    return many
+
+
+def _cell(value: float | None, digits: int = 3) -> str:
+    """Число для markdown-таблицы; не вычисленное значение — прочерк."""
+    return "—" if value is None else f"{value:.{digits}f}"
+
+
+SELECT_SPLIT = "tune"
+
+
+def select_methods() -> list[dict[str, object]]:
+    """Варианты подбора §6: сырой сигнал, 4 окна среднего, 30 Баттервортов."""
+    methods: list[dict[str, object]] = [
+        {"name": "raw", "label": "сырой сигнал", "kind": "raw"}]
+    for window in MOVING_WINDOWS:
+        methods.append({
+            "name": f"moving_average_{window}",
+            "label": f"скользящее среднее, окно {window}",
+            "kind": "moving_average",
+            "window": window,
+        })
+    for combination in filter_grid():
+        f_low = float(combination["f_low_hz"])
+        f_high = float(combination["f_high_hz"])
+        order = int(combination["N"])
+        label = f"Баттерворт N={order}, {f_low:.2f}–{f_high:g} Гц"
+        methods.append({
+            "name": f"butterworth_{f_low:.2f}_{f_high:.1f}_N{order}",
+            "label": label.replace(".", ","),
+            "kind": "butterworth",
+            **combination,
+        })
+    return methods
+
+
+def _ru_float(value: float, digits: int = 2) -> str:
+    """Число с десятичной запятой для подписей на русском."""
+    return f"{float(value):.{digits}f}".replace(".", ",")
+
+
+def settings_label(settings: dict[str, object]) -> str:
+    """Короткое описание параметров обработки для таблиц."""
+    kind = settings.get("kind")
+    if kind == "raw":
+        return "—"
+    if kind == "moving_average":
+        return f"окно {settings['window']}"
+    if kind == "butterworth":
+        return (f"N={settings['N']}, "
+                f"{_ru_float(settings['f_low_hz'])}–"
+                f"{float(settings['f_high_hz']):g} Гц")
+    return str(kind)
+
+
+def _check_sha(path: Path, expected: str, label: str) -> None:
+    if sha256_file(path) != expected:
+        raise ValueError(f"SHA-256 {label} не совпал с манифестом")
+
+
+def _load_select_inputs(dataset) -> dict[str, dict[str, object]]:
+    """24 эталона части tune и их 120 шумовых входов с проверкой SHA (§6)."""
+    rows = [row for row in dataset.rows if row.split == SELECT_SPLIT]
+    reference_ids = sorted({row.reference_id for row in rows}, key=natural_key)
+    expected_inputs = EXPECTED_PER_SPLIT * 5
+    if len(reference_ids) != EXPECTED_PER_SPLIT or len(rows) != expected_inputs:
+        raise ValueError(
+            f"в части {SELECT_SPLIT}: эталонов {len(reference_ids)} "
+            f"(ожидалось {EXPECTED_PER_SPLIT}), входов {len(rows)} "
+            f"(ожидалось {expected_inputs})")
+    loaded: dict[str, dict[str, object]] = {}
+    for reference_id in reference_ids:
+        reference = dataset.references[reference_id]
+        if any(row.split != SELECT_SPLIT for row in reference.inputs):
+            raise ValueError(f"эталон {reference_id}: есть входы вне части "
+                             f"{SELECT_SPLIT}")
+        _check_sha(reference.clean_path, reference.inputs[0].clean_sha256,
+                   f"чистого эталона {reference_id}")
+        inputs = sorted(reference.inputs, key=lambda row: row.noise_repeat)
+        signals: dict[str, object] = {}
+        for row in inputs:
+            path = (dataset.data_dir / row.noisy_path).resolve()
+            _check_sha(path, row.noisy_sha256, f"входа {row.input_id}")
+            signals[row.input_id] = read_signal(
+                path, expected_samples=SAMPLES_PER_RECORD)
+        mask = select_evaluation_mask(reference.waves, fs=FS_HZ)
+        if not mask.any():
+            raise ValueError(
+                f"эталон {reference_id}: в окне "
+                f"{EVAL_START_SEC:.0f}–{EVAL_END_SEC:.0f} с нет полных волн")
+        loaded[reference_id] = {
+            "rows": inputs,
+            "clean": reference.clean,
+            "waves": reference.waves,
+            "mask": mask,
+            "signals": signals,
+        }
+    return loaded
+
+
+def _nested_error(groups, key: str) -> float | None:
+    return nested_mean({
+        reference_id: {input_id: values[key]
+                       for input_id, values in inputs.items()}
+        for reference_id, inputs in groups.items()})
+
+
+def _error_count(groups, key: str) -> int:
+    return sum(1 for inputs in groups.values()
+               for values in inputs.values()
+               for value in values[key] if value is not None)
+
+
+def _select_summary(method: dict[str, object], norm_groups, abs_groups,
+                    totals) -> dict[str, object]:
+    """Ошибки и отказы варианта: средние §2 по 24 эталонам и 5 повторам."""
+    return {
+        "name": method["name"],
+        "label": method["label"],
+        "settings": method_settings(method),
+        "mean_absolute": {key: _nested_error(abs_groups, key)
+                          for key in ABS_KEYS},
+        "mean_normalized_pct": {key: _nested_error(norm_groups, key)
+                                for key in ABS_KEYS},
+        "values_count": {key: _error_count(abs_groups, key)
+                         for key in ABS_KEYS},
+        "refusals": {
+            "first_peak": refusal_stats(*totals["first"]),
+            "second_peak": refusal_stats(*totals["second"]),
+        },
+    }
+
+
+def _brief(entry: dict[str, object] | None) -> dict[str, object] | None:
+    """Краткая запись выбранного варианта для ``run.json``."""
+    if entry is None:
+        return None
+    return {
+        "name": entry["name"],
+        "label": entry["label"],
+        "settings": entry["settings"],
+        "score_pct": entry["score_pct"],
+        "mean_absolute": entry["mean_absolute"],
+        "mean_normalized_pct": entry["mean_normalized_pct"],
+    }
+
+
+def run_select(data_dir: Path, results_dir: Path) -> int:
+    """Этап ``select``: 35 вариантов на данных tune и выбор по §7 (§6)."""
+    started = time.perf_counter()
+    out_dir = results_dir / "select"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    log: list[str] = []
+
+    def say(message: str = "") -> None:
+        print(message)
+        log.append(message)
+
+    say("run_experiment.py select — подбор параметров на данных tune (§6, §7)")
+    say(f"Каталог данных: {data_dir}")
+    say(f"Каталог результатов: {out_dir}")
+
+    verify_code, verify_passed = _run_verifier(out_dir, say)
+    if verify_code != 0:
+        say("Подбор остановлен: верификатор не прошёл.")
+        _write_log(out_dir / "run_log.txt", log)
+        return verify_code
+
+    try:
+        dataset = load_dataset(data_dir)
+        loaded = _load_select_inputs(dataset)
+    except (FileNotFoundError, ValueError) as exc:
+        say(f"Подбор остановлен: данные не готовы: {exc}")
+        _write_log(out_dir / "run_log.txt", log)
+        return 1
+
+    reference_ids = list(loaded)
+    methods = select_methods()
+    waves_total = sum(len(item["waves"]) for item in loaded.values())
+    waves_evaluated = sum(int(item["mask"].sum()) for item in loaded.values())
+    waves_second = sum(
+        int(item["waves"].has_diastolic_peak[item["mask"]].sum())
+        for item in loaded.values())
+    inputs_total = sum(len(item["rows"]) for item in loaded.values())
+    say(f"Эталонов: {len(reference_ids)}, шумовых входов: {inputs_total}; "
+        f"вариантов обработки: {len(methods)}.")
+    say(f"Волн: всего {waves_total}, в окне оценки {waves_evaluated}, "
+        f"с вторым пиком {waves_second}.")
+
+    entries: list[dict[str, object]] = []
+    error_rows: list[dict[str, object]] = []
+    refusal_rows: list[dict[str, object]] = []
+    by_reference_rows: list[dict[str, object]] = []
+    etalon_totals = {"first": [0, 0], "second": [0, 0]}
+    try:
+        for index, method in enumerate(methods):
+            method_started = time.perf_counter()
+            norm_groups: dict[str, dict[str, dict[str, list]]] = {}
+            abs_groups: dict[str, dict[str, dict[str, list]]] = {}
+            totals = {"first": [0, 0], "second": [0, 0]}
+            for reference_id, item in loaded.items():
+                norm_ref = norm_groups.setdefault(reference_id, {})
+                abs_ref = abs_groups.setdefault(reference_id, {})
+                for row in item["rows"]:
+                    processed = apply_method(item["signals"][row.input_id],
+                                             method, fs=FS_HZ)
+                    comparisons = compare_waves(
+                        item["waves"], item["clean"], processed,
+                        item["mask"], fs=FS_HZ)
+                    normalized = error_series(comparisons, normalized=True)
+                    absolute = error_series(comparisons)
+                    norm_input = norm_ref.setdefault(row.input_id, {})
+                    abs_input = abs_ref.setdefault(row.input_id, {})
+                    for key in ABS_KEYS:
+                        norm_input.setdefault(key, []).extend(normalized[key])
+                        abs_input.setdefault(key, []).extend(absolute[key])
+                    refusals = refusal_summary(comparisons)
+                    for peak in ("first", "second"):
+                        stats = refusals[f"{peak}_peak"]
+                        totals[peak][0] += stats["expected"]
+                        totals[peak][1] += stats["successes"]
+                    if index == 0:
+                        reference_stats = etalon_refusal_summary(comparisons)
+                        for peak in ("first", "second"):
+                            stats = reference_stats[f"{peak}_peak"]
+                            etalon_totals[peak][0] += stats["expected"]
+                            etalon_totals[peak][1] += stats["successes"]
+
+            entry = _select_summary(method, norm_groups, abs_groups, totals)
+            entry["score_pct"] = peak_score(entry)
+            entry["admissible"] = is_admissible(entry)
+            entry["elapsed_sec"] = round(
+                time.perf_counter() - method_started, 2)
+            entries.append(entry)
+
+            values = entry["mean_normalized_pct"]
+            first_refusals = (entry["refusals"]["first_peak"]["expected"]
+                              - entry["refusals"]["first_peak"]["successes"])
+            second_refusals = (entry["refusals"]["second_peak"]["expected"]
+                               - entry["refusals"]["second_peak"]["successes"])
+            verdict = "допустим" if entry["admissible"] else "не допустим"
+            say(f"[{index + 1:2d}/{len(methods)}] {entry['label']}: "
+                f"E_A1 {_cell(values['A1'])} %, E_t1 {_cell(values['t1'])} %, "
+                f"E_A2 {_cell(values['A2'])} %, "
+                f"E_t2 {_cell(values['t2'])} %; "
+                f"отказы {first_refusals}/{second_refusals}; "
+                f"оценка {_cell(entry['score_pct'])}; {verdict}")
+
+            for key in ABS_KEYS:
+                error_rows.append({
+                    "method": entry["name"],
+                    "method_label": entry["label"],
+                    "kind": entry["settings"].get("kind"),
+                    "metric": key,
+                    "mean_absolute": _num(entry["mean_absolute"][key]),
+                    "mean_normalized_pct": _num(
+                        entry["mean_normalized_pct"][key]),
+                    "values_count": entry["values_count"][key],
+                })
+            for peak, peak_label in (("first_peak", "первый"),
+                                     ("second_peak", "второй")):
+                stats = entry["refusals"][peak]
+                refusal_rows.append({
+                    "method": entry["name"],
+                    "method_label": entry["label"],
+                    "kind": entry["settings"].get("kind"),
+                    "peak": peak_label,
+                    "expected": stats["expected"],
+                    "successes": stats["successes"],
+                    "refusals": stats["expected"] - stats["successes"],
+                    "refusal_pct": _num(stats["refusal_pct"]),
+                })
+            for reference_id, inputs in norm_groups.items():
+                reference = dataset.references[reference_id]
+                abs_inputs = abs_groups[reference_id]
+                for key in ABS_KEYS:
+                    norm_value = nested_mean({reference_id: {
+                        input_id: values[key]
+                        for input_id, values in inputs.items()}})
+                    abs_value = nested_mean({reference_id: {
+                        input_id: values[key]
+                        for input_id, values in abs_inputs.items()}})
+                    by_reference_rows.append({
+                        "method": entry["name"],
+                        "method_label": entry["label"],
+                        "reference_id": reference_id,
+                        "wave_class": reference.wave_class,
+                        "wave_class_label": CLASS_LABELS[
+                            reference.wave_class],
+                        "metric": key,
+                        "mean_absolute": _num(abs_value),
+                        "mean_normalized_pct": _num(norm_value),
+                        "values_count": _error_count({reference_id: inputs},
+                                                     key),
+                    })
+    except ValueError as exc:
+        say(f"Остановка: расчёт прерван ({exc}). §6 требует исправить "
+            f"программу до продолжения.")
+        _write_log(out_dir / "run_log.txt", log)
+        return 1
+
+    butterworth = [entry for entry in entries
+                   if entry["settings"].get("kind") == "butterworth"]
+    moving = [entry for entry in entries
+              if entry["settings"].get("kind") == "moving_average"]
+    raw_entry = next(entry for entry in entries
+                     if entry["settings"].get("kind") == "raw")
+    chosen_butterworth = choose_butterworth(butterworth)
+    chosen_moving = choose_moving_average(moving)
+    admissible_counts = {
+        "butterworth": count_admissible(butterworth),
+        "moving_average": count_admissible(moving),
+    }
+
+    if chosen_butterworth is None:
+        termination = {
+            "butterworth_found": False,
+            "moving_average_found": chosen_moving is not None,
+            "action": ("Допустимый Баттерворт не найден: основной прогон "
+                       "не выполняется, таблица подбора сохранена (§7.7)"),
+        }
+    elif chosen_moving is None:
+        termination = {
+            "butterworth_found": True,
+            "moving_average_found": False,
+            "action": ("Допустимое среднее не найдено: основной прогон "
+                       "сравнит Баттерворт только с сырым сигналом; полное "
+                       "подтверждение гипотезы невозможно (§7.7)"),
+        }
+    else:
+        termination = {
+            "butterworth_found": True,
+            "moving_average_found": True,
+            "action": ("Настройки выбраны; основной прогон — после фиксации "
+                       "настроек коммитом (§7.4)"),
+        }
+
+    stage_methods = [raw_entry]
+    if chosen_moving is not None:
+        stage_methods.append(chosen_moving)
+    if chosen_butterworth is not None:
+        stage_methods.append(chosen_butterworth)
+
+    selection = {
+        "rule": "§7",
+        "thresholds": {
+            "e_a1_max_pct": 5.0,
+            "e_t1_max_pct": 5.0,
+            "refusals": "не допускаются ни на одном пике",
+        },
+        "score": "минимум max(E_A2, E_t2) после усреднения §2",
+        "tie_break": {
+            "moving_average": "меньшее окно",
+            "butterworth": ("меньший N, затем меньшая нижняя, затем "
+                            "меньшая верхняя частота"),
+        },
+        "admissible_counts": admissible_counts,
+        "chosen": {
+            "butterworth": _brief(chosen_butterworth),
+            "moving_average": _brief(chosen_moving),
+            "raw": _brief(raw_entry),
+        },
+        "termination": termination,
+    }
+
+    evaluated_inputs = sorted(
+        (row.input_id for item in loaded.values() for row in item["rows"]),
+        key=natural_key)
+    candidates_rows = []
+    for entry in entries:
+        settings = entry["settings"]
+        refusals = entry["refusals"]
+        candidates_rows.append({
+            "method": entry["name"],
+            "method_label": entry["label"],
+            "kind": settings.get("kind"),
+            "window": _index(settings.get("window")),
+            "f_low_hz": _num(settings.get("f_low_hz")),
+            "f_high_hz": _num(settings.get("f_high_hz")),
+            "N": _index(settings.get("N")),
+            "e_a1_pct": _num(entry["mean_normalized_pct"]["A1"]),
+            "e_t1_pct": _num(entry["mean_normalized_pct"]["t1"]),
+            "e_a2_pct": _num(entry["mean_normalized_pct"]["A2"]),
+            "e_t2_pct": _num(entry["mean_normalized_pct"]["t2"]),
+            "score_pct": _num(entry["score_pct"]),
+            "admissible": int(entry["admissible"]),
+            "refusals_first": refusals["first_peak"]["expected"]
+                              - refusals["first_peak"]["successes"],
+            "refusals_second": refusals["second_peak"]["expected"]
+                               - refusals["second_peak"]["successes"],
+            "elapsed_sec": entry["elapsed_sec"],
+        })
+
+    _write_csv(
+        out_dir / "errors.csv",
+        ["method", "method_label", "kind", "metric", "mean_absolute",
+         "mean_normalized_pct", "values_count"],
+        error_rows)
+    _write_csv(
+        out_dir / "refusals.csv",
+        ["method", "method_label", "kind", "peak", "expected", "successes",
+         "refusals", "refusal_pct"],
+        refusal_rows)
+    _write_csv(
+        out_dir / "by_reference.csv",
+        ["method", "method_label", "reference_id", "wave_class",
+         "wave_class_label", "metric", "mean_absolute", "mean_normalized_pct",
+         "values_count"],
+        by_reference_rows)
+    _write_csv(
+        out_dir / "candidates.csv",
+        ["method", "method_label", "kind", "window", "f_low_hz", "f_high_hz",
+         "N", "e_a1_pct", "e_t1_pct", "e_a2_pct", "e_t2_pct", "score_pct",
+         "admissible", "refusals_first", "refusals_second", "elapsed_sec"],
+        candidates_rows)
+
+    elapsed = time.perf_counter() - started
+    try:
+        data_dir_label = str(data_dir.relative_to(ROOT))
+    except ValueError:
+        data_dir_label = str(data_dir)
+    report = {
+        "stage": "select",
+        "status": "ok",
+        "generated_at": datetime.now().astimezone().isoformat(
+            timespec="seconds"),
+        "git_commit": _git_commit(),
+        "dataset_version": DATASET_VERSION,
+        "data_dir": data_dir_label,
+        "fs_hz": FS_HZ,
+        "evaluation_window_sec": [EVAL_START_SEC, EVAL_END_SEC],
+        "split": SELECT_SPLIT,
+        "counts": {
+            "references": len(reference_ids),
+            "inputs": inputs_total,
+            "methods": len(methods),
+            "butterworth": len(butterworth),
+            "moving_average": len(moving),
+            "raw": 1,
+        },
+        "waves": {
+            "total": waves_total,
+            "evaluated": waves_evaluated,
+            "evaluated_with_second_peak": waves_second,
+        },
+        "etalon_refusals": {
+            "first_peak": refusal_stats(*etalon_totals["first"]),
+            "second_peak": refusal_stats(*etalon_totals["second"]),
+        },
+        "methods": stage_methods,
+        "candidates": entries,
+        "selection": selection,
+        "evaluated_inputs": evaluated_inputs,
+        "verifier": {"exit_code": verify_code, "result": verify_passed},
+        "environment": {
+            "python": platform.python_version(),
+            "packages": _package_versions(),
+        },
+        "elapsed_sec": round(elapsed, 2),
+    }
+    (out_dir / "run.json").write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8")
+    _write_select_summary(out_dir / "summary.md", report)
+
+    say("")
+    say("Выбранные настройки (§7):")
+    for title, chosen in (("Баттерворт", chosen_butterworth),
+                          ("среднее", chosen_moving)):
+        if chosen is None:
+            say(f"  {title}: допустимого варианта нет")
+        else:
+            say(f"  {title}: {chosen['label']} — оценка "
+                f"{_cell(chosen['score_pct'])} %")
+    say(f"Итог §7.7: {termination['action']}.")
+    if chosen_butterworth is not None:
+        say("Следующий шаг: зафиксировать настройки коммитом до main.")
+    say(f"Длительность этапа: {elapsed:.2f} с")
+    _write_log(out_dir / "run_log.txt", log)
+    return 0
+
+
+def _write_select_summary(path: Path, report: dict) -> None:
+    selection = report["selection"]
+    counts = report["counts"]
+    waves = report["waves"]
+    window = report["evaluation_window_sec"]
+    lines = [
+        "# Подбор параметров",
+        "",
+        f"Статус: **{report['status']}**. Сгенерировано "
+        f"{report['generated_at']}; коммит `{report['git_commit']}`.",
+        "",
+        f"Данные для подбора (§6): {counts['references']} "
+        f"{_plural(counts['references'], 'эталон', 'эталона', 'эталонов')}, "
+        f"{counts['inputs']} шумовых "
+        f"{_plural(counts['inputs'], 'вход', 'входа', 'входов')}; "
+        f"вариантов обработки "
+        f"{counts['methods']}: сырой сигнал, {counts['moving_average']} "
+        f"{_plural(counts['moving_average'], 'окно', 'окна', 'окон')} "
+        f"среднего, {counts['butterworth']} "
+        f"{_plural(counts['butterworth'], 'полоса', 'полосы', 'полос')} "
+        f"Баттерворта.",
+        f"Волн в окне оценки {window[0]:.0f}–{window[1]:.0f} с: "
+        f"{waves['evaluated']} из {waves['total']}, с вторым пиком "
+        f"{waves['evaluated_with_second_peak']}.",
+        "",
+        "## Правило §7",
+        "",
+        f"- Допустимы варианты без отказов и с E(A1) ≤ "
+        f"{selection['thresholds']['e_a1_max_pct']:g} %, E(t1) ≤ "
+        f"{selection['thresholds']['e_t1_max_pct']:g} %.",
+        f"- Оценка: {selection['score']}.",
+        "- Равенство оценок: среднее — меньшее окно; Баттерворт — меньший N, "
+        "затем меньшая нижняя, затем меньшая верхняя частота.",
+        "",
+        "## Выбранные настройки",
+        "",
+        "| Обработка | Параметры | E(A1), % | E(t1), % | E(A2), % | "
+        "E(t2), % | Оценка, % |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for title, key in (("Баттерворт", "butterworth"),
+                       ("Скользящее среднее", "moving_average")):
+        chosen = selection["chosen"][key]
+        if chosen is None:
+            lines.append(f"| {title} | нет допустимого варианта | | | | | |")
+            continue
+        values = chosen["mean_normalized_pct"]
+        lines.append(
+            f"| {title} | {settings_label(chosen['settings'])} | "
+            f"{_cell(values['A1'])} | {_cell(values['t1'])} | "
+            f"{_cell(values['A2'])} | {_cell(values['t2'])} | "
+            f"{_cell(chosen['score_pct'])} |")
+    raw = selection["chosen"]["raw"]
+    values = raw["mean_normalized_pct"]
+    lines += [
+        f"| Сырой сигнал (база) | — | {_cell(values['A1'])} | "
+        f"{_cell(values['t1'])} | {_cell(values['A2'])} | "
+        f"{_cell(values['t2'])} | {_cell(raw['score_pct'])} |",
+        "",
+        "## Абсолютные ошибки выбранных вариантов",
+        "",
+        "| Обработка | A1 | t1 | A2 | t2 |",
+        "|---|---|---|---|---|",
+    ]
+    for title, key in (("Баттерворт", "butterworth"),
+                       ("Скользящее среднее", "moving_average"),
+                       ("Сырой сигнал", "raw")):
+        chosen = selection["chosen"][key]
+        if chosen is None:
+            continue
+        values = chosen["mean_absolute"]
+        lines.append(
+            f"| {title} | {_cell(values['A1'], 4)} | "
+            f"{_cell(values['t1'], 3)} | {_cell(values['A2'], 4)} | "
+            f"{_cell(values['t2'], 3)} |")
+    lines += [
+        "",
+        "Амплитуды — условные единицы, времена — мс.",
+        "",
+        "## Решение по §7.7",
+        "",
+        selection["termination"]["action"] + ".",
+        "",
+        f"Допустимых вариантов: Баттерворт — "
+        f"{selection['admissible_counts']['butterworth']} из "
+        f"{counts['butterworth']}, среднее — "
+        f"{selection['admissible_counts']['moving_average']} из "
+        f"{counts['moving_average']}.",
+        "",
+    ]
+
+    butterworth = [entry for entry in report["candidates"]
+                   if entry["settings"].get("kind") == "butterworth"]
+    moving = [entry for entry in report["candidates"]
+              if entry["settings"].get("kind") == "moving_average"]
+
+    def order(entry):
+        score = entry["score_pct"]
+        settings = entry["settings"]
+        return (not entry["admissible"],
+                float("inf") if score is None else score,
+                int(settings.get("N") or 0),
+                float(settings.get("f_low_hz") or 0.0),
+                float(settings.get("f_high_hz") or 0.0),
+                int(settings.get("window") or 0))
+
+    lines += [
+        "## Варианты Баттерворта (допустимые сверху)",
+        "",
+        "| N | Нижняя, Гц | Верхняя, Гц | E(A1), % | E(t1), % | E(A2), % | "
+        "E(t2), % | Оценка, % | Допустим |",
+        "|---|---|---|---|---|---|---|---|---|",
+    ]
+    for entry in sorted(butterworth, key=order):
+        settings = entry["settings"]
+        values = entry["mean_normalized_pct"]
+        lines.append(
+            f"| {settings['N']} | {float(settings['f_low_hz']):.2f} | "
+            f"{float(settings['f_high_hz']):g} | "
+            f"{_cell(values['A1'])} | {_cell(values['t1'])} | "
+            f"{_cell(values['A2'])} | {_cell(values['t2'])} | "
+            f"{_cell(entry['score_pct'])} | "
+            f"{'да' if entry['admissible'] else 'нет'} |")
+
+    lines += [
+        "",
+        "## Скользящее среднее",
+        "",
+        "| Окно | E(A1), % | E(t1), % | E(A2), % | E(t2), % | Оценка, % | "
+        "Допустим |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for entry in sorted(moving, key=order):
+        values = entry["mean_normalized_pct"]
+        lines.append(
+            f"| {entry['settings']['window']} | {_cell(values['A1'])} | "
+            f"{_cell(values['t1'])} | {_cell(values['A2'])} | "
+            f"{_cell(values['t2'])} | {_cell(entry['score_pct'])} | "
+            f"{'да' if entry['admissible'] else 'нет'} |")
+
+    lines += [
+        "",
+        "## Диагностика",
+        "",
+        "- Полные ошибки по вариантам: `errors.csv`; отказы: `refusals.csv`; "
+        "сводка по эталонам: `by_reference.csv`; параметры и допуск "
+        "вариантов: `candidates.csv`.",
+        "- Выбранные настройки сохранены в `run.json` (`methods`, "
+        "`selection`) — их читают основной прогон и графики.",
+        "- Графики по сохранённым настройкам: "
+        "`plot_comparison.py --results results/select`; другие варианты — "
+        "параметром `--method`.",
+        "",
+        f"Верификатор: код {report['verifier']['exit_code']} "
+        f"({report['verifier']['result']}).",
+        f"Длительность этапа: {report['elapsed_sec']} с.",
+        "",
+    ]
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
 def _not_implemented(stage: str) -> int:
-    print(f"Этап {stage!r} ещё не реализован. Сейчас доступен только "
-          f"'prepare' (см. results/prepare/).")
+    print(f"Этап {stage!r} ещё не реализован. Доступны этапы "
+          f"'prepare', 'test' и 'select' (см. results/).")
     return 3
 
 
@@ -898,14 +1556,20 @@ def main(argv: list[str] | None = None) -> int:
     test.add_argument("--data-dir", type=Path, default=ROOT / "data")
     test.add_argument("--results-dir", type=Path, default=ROOT / "results")
 
-    for name in ("select", "main"):
-        subparsers.add_parser(name, help=f"этап {name} (пока не реализован)")
+    select = subparsers.add_parser(
+        "select", help="подбор параметров на данных для подбора (§6)")
+    select.add_argument("--data-dir", type=Path, default=ROOT / "data")
+    select.add_argument("--results-dir", type=Path, default=ROOT / "results")
+
+    subparsers.add_parser("main", help="этап main (пока не реализован)")
 
     args = parser.parse_args(argv)
     if args.stage == "prepare":
         return run_prepare(args.data_dir.resolve(), args.results_dir.resolve())
     if args.stage == "test":
         return run_test(args.data_dir.resolve(), args.results_dir.resolve())
+    if args.stage == "select":
+        return run_select(args.data_dir.resolve(), args.results_dir.resolve())
     return _not_implemented(args.stage)
 
 
